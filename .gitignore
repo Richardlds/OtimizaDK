@@ -1,0 +1,15 @@
+# Configurações de Ambiente
+.env
+
+# Editores
+.vscode/
+.idea/
+
+# Arquivos do Sistema Operacional
+.DS_Store
+Thumbs.db
+
+# Dependências (se usar npm/node no futuro)
+node_modules/
+dist/
+.env.local

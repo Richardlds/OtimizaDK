@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OTIMIZADK - Base de Conhecimento</title>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- Fontes Customizadas -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Mobile Menu Button -->
+    <button class="mobile-menu-btn" id="mobileMenuBtn">
+        <i data-lucide="menu"></i>
+    </button>
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-logo">
+            <span class="logo-icon"><i data-lucide="zap"></i></span>
+            <span class="logo-text">OTIMIZADK</span>
+            <span class="logo-kb">KB</span>
+        </div>
+        
+        <nav class="sidebar-nav">
+            <button class="nav-item active">
+                <span class="nav-icon"><i data-lucide="book"></i></span>
+                Conhecimento
+            </button>
+            <div class="nav-divider"></div>
+        </nav>
+        
+        <div class="sidebar-footer">
+            <span class="version-tag">v1.3.0</span>
+            <button class="theme-toggle" id="themeToggle" title="Trocar Tema">
+                <i data-lucide="moon"></i>
+            </button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Topbar -->
+        <header class="topbar">
+            <h1 class="page-title">Base de Conhecimento</h1>
+            
+            <div class="topbar-right">
+                <div class="search-wrapper" id="searchWrapper">
+                    <span class="search-icon" style="display:flex; align-items:center;"><i data-lucide="search" style="width: 16px;"></i></span>
+                    <input type="text" class="global-search" id="searchInput" placeholder="Pesquisar procedimentos...">
+                    <span class="search-shortcut">/</span>
+                </div>
+                
+                <input type="file" id="fileInput" accept=".json" style="display: none;">
+                <button class="btn-secondary" id="btnImportar"><i data-lucide="upload-cloud" style="width: 15px; margin-right: 6px;"></i> Importar</button>
+                <button class="btn-secondary" id="btnExportar"><i data-lucide="download-cloud" style="width: 15px; margin-right: 6px;"></i> Exportar</button>
+                <button class="btn-add" id="btnAdicionar"><i data-lucide="plus" style="width: 15px; margin-right: 4px;"></i> Novo</button>
+            </div>
+        </header>
+
+        <!-- Page Content -->
+        <div class="page active" id="page-knowledge">
+            
+            <div class="search-filters-row" style="padding: 0 0 16px 0; border: none; gap: 12px; display: flex; align-items: center; flex-wrap: wrap;">
+                <select id="filterTipo" class="form-group select" style="width: auto; padding: 7px 12px; border-radius: var(--radius-sm); background: var(--bg-2); border: 1px solid var(--border); color: var(--text-primary); outline: none; font-family: var(--font-mono); font-size: 13px; cursor: pointer;">
+                    <option value="">Todos os Tipos</option>
+                    <option value="Erro">Apenas Erros</option>
+                    <option value="Procedimento">Apenas Procedimentos</option>
+                    <option value="FAQ">Dúvidas / FAQ</option>
+                </select>
+                
+                <select id="filterEstado" class="form-group select" style="width: auto; padding: 7px 12px; border-radius: var(--radius-sm); background: var(--bg-2); border: 1px solid var(--border); color: var(--text-primary); outline: none; font-family: var(--font-mono); font-size: 13px; cursor: pointer;">
+                    <option value="">Todos os Estados</option>
+                    <option value="Nacional">Nacional (Todos)</option>
+                    <option value="SP">São Paulo (SP)</option>
+                    <option value="RJ">Rio de Janeiro (RJ)</option>
+                    <option value="MG">Minas Gerais (MG)</option>
+                    <option value="BA">Bahia (BA)</option>
+                    <option value="PR">Paraná (PR)</option>
+                    <option value="RS">Rio Grande do Sul (RS)</option>
+                    <option value="SC">Santa Catarina (SC)</option>
+                    <option value="GO">Goiás (GO)</option>
+                    <option value="DF">Distrito Federal (DF)</option>
+                </select>
+            </div>
+
+            <div class="filters-bar" id="filtersContainer">
+                <!-- Chips gerados dinamicamente -->
+            </div>
+            
+            <div class="knowledge-grid" id="cardsContainer">
+                <!-- Cards dinâmicos -->
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal Adicionar / Editar -->
+    <div class="modal-overlay" id="modalForm">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="modalTitle">Novo Procedimento</h2>
+                <button class="modal-close" id="closeFormModal"><i data-lucide="x" style="width: 20px;"></i></button>
+            </div>
+            
+            <div class="modal-body">
+                <form id="formProcedimento">
+                    <input type="hidden" id="erroId">
+                    
+                    <div class="form-group">
+                        <label>Título / Problema</label>
+                        <input type="text" id="nomeErro" required placeholder="Ex: Falha na impressora fiscal">
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Categoria (Tipo)</label>
+                            <select id="tipo" required>
+                                <option value="Erro">Erro (Incidente)</option>
+                                <option value="Procedimento">Procedimento (Manual)</option>
+                                <option value="FAQ">Dúvida / FAQ</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Estado (UF)</label>
+                            <select id="estado" required>
+                                <option value="Nacional">Nacional (Geral)</option>
+                                <option value="AC">Acre (AC)</option>
+                                <option value="AL">Alagoas (AL)</option>
+                                <option value="AP">Amapá (AP)</option>
+                                <option value="AM">Amazonas (AM)</option>
+                                <option value="BA">Bahia (BA)</option>
+                                <option value="CE">Ceará (CE)</option>
+                                <option value="DF">Distrito Federal (DF)</option>
+                                <option value="ES">Espírito Santo (ES)</option>
+                                <option value="GO">Goiás (GO)</option>
+                                <option value="MA">Maranhão (MA)</option>
+                                <option value="MT">Mato Grosso (MT)</option>
+                                <option value="MS">Mato Grosso do Sul (MS)</option>
+                                <option value="MG">Minas Gerais (MG)</option>
+                                <option value="PA">Pará (PA)</option>
+                                <option value="PB">Paraíba (PB)</option>
+                                <option value="PR">Paraná (PR)</option>
+                                <option value="PE">Pernambuco (PE)</option>
+                                <option value="PI">Piauí (PI)</option>
+                                <option value="RJ">Rio de Janeiro (RJ)</option>
+                                <option value="RN">Rio Grande do Norte (RN)</option>
+                                <option value="RS">Rio Grande do Sul (RS)</option>
+                                <option value="RO">Rondônia (RO)</option>
+                                <option value="RR">Roraima (RR)</option>
+                                <option value="SC">Santa Catarina (SC)</option>
+                                <option value="SP">São Paulo (SP)</option>
+                                <option value="SE">Sergipe (SE)</option>
+                                <option value="TO">Tocantins (TO)</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Tags (Opcional, separadas por vírgula)</label>
+                        <input type="text" id="tags" placeholder="pdv, impressora, wifi">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Anexar Imagem (Opcional - Máx 2MB)</label>
+                        <input type="file" id="imagemUpload" accept="image/*" style="padding: 6px; cursor: pointer; color: var(--text-secondary); font-size: 13px;">
+                        <input type="hidden" id="imagemBase64">
+                        <div id="imagemPreview" style="margin-top: 8px; display: none;">
+                            <img src="" style="max-width: 100%; max-height: 150px; border-radius: var(--radius-sm); border: 1px solid var(--border);">
+                            <button type="button" class="btn-secondary" id="btnRemoverImagem" style="margin-top: 6px; padding: 4px 10px; font-size: 11px;"><i data-lucide="trash" style="width: 12px; margin-right: 4px;"></i> Remover Imagem</button>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Contexto / Detalhes</label>
+                        <textarea id="procedimento" rows="3" required placeholder="Cenário ou regra de negócio..."></textarea>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Como Resolver</label>
+                        <textarea id="comoResolver" rows="5" required placeholder="Passo a passo detalhado..."></textarea>
+                    </div>
+                    
+                    <div class="modal-footer">
+                        <button type="button" class="btn-secondary" id="btnCancelForm">Cancelar</button>
+                        <button type="submit" class="btn-primary">Salvar</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Visualizar -->
+    <div class="modal-overlay" id="modalView">
+        <div class="modal modal-large">
+            <div class="modal-header">
+                <h2 id="viewTitle" class="view-title" style="margin-bottom: 0;">Visualizar</h2>
+                <button class="modal-close" id="closeViewModal"><i data-lucide="x" style="width: 20px;"></i></button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="card-badges" id="viewTags" style="margin-bottom: 20px;"></div>
+                
+                <div class="view-section" id="viewImageSection" style="display: none;">
+                    <h3 class="view-section-title">Anexo</h3>
+                    <img id="viewImage" src="" style="max-width: 100%; max-height: 400px; border-radius: var(--radius); border: 1px solid var(--border);">
+                </div>
+
+                <div class="view-section">
+                    <h3 class="view-section-title">Contexto</h3>
+                    <div class="view-text" id="viewProcedimento"></div>
+                </div>
+                
+                <div class="view-section">
+                    <h3 class="view-section-title">Como Resolver</h3>
+                    <div class="view-text" id="viewComoResolver"></div>
+                    <button class="copy-btn" id="btnCopiar"><i data-lucide="copy" style="width: 14px; margin-right: 6px;"></i> Copiar Solução</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Container de Toasts para Alertas -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script src="script.js"></script>
+</body>
+</html>

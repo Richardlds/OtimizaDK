@@ -120,7 +120,9 @@ const themeToggle = document.getElementById('themeToggle');
 
 // State
 let dados = [];
-let tagFiltroAtiva = null; 
+let tagFiltroAtiva = null;
+let tsFilterEstado = null;
+let tsEstado = null; 
 
 // ==========================================
 // INITIALIZATION
@@ -335,7 +337,8 @@ btnAdicionar.addEventListener('click', () => {
     formProcedimento.reset(); 
     erroIdInput.value = '';   
     document.getElementById('tipo').value = 'Procedimento';
-    document.getElementById('estado').value = 'Nacional';
+    if (tsEstado) tsEstado.setValue('Nacional');
+    else document.getElementById('estado').value = 'Nacional';
     imagemUpload.value = '';
     imagemBase64.value = '';
     imagemPreview.style.display = 'none';
@@ -397,7 +400,8 @@ window.abrirEdicao = function(id) {
     erroIdInput.value = registro.id;
     document.getElementById('nomeErro').value = registro.nomeErro;
     document.getElementById('tipo').value = registro.tipo || 'Erro';
-    document.getElementById('estado').value = registro.estado || 'Nacional';
+    if (tsEstado) tsEstado.setValue(registro.estado || 'Nacional');
+    else document.getElementById('estado').value = registro.estado || 'Nacional';
     document.getElementById('tags').value = registro.tags || '';
     document.getElementById('procedimento').value = registro.procedimento;
     document.getElementById('comoResolver').value = registro.comoResolver;
@@ -607,3 +611,17 @@ window.addEventListener('click', (e) => {
 
 // Inicia
 init();
+
+// Inicializa a pesquisa nos dropdowns de estado
+if (window.TomSelect) {
+    new TomSelect('#filterEstado', {
+        create: false,
+        placeholder: 'Todos os Estados',
+        allowEmptyOption: true
+    });
+    
+    new TomSelect('#estado', {
+        create: false,
+        placeholder: 'Selecione o Estado'
+    });
+}

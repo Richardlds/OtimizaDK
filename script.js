@@ -126,6 +126,14 @@ let tagFiltroAtiva = null;
 // INITIALIZATION
 // ==========================================
 async function init() {
+    cardsContainer.innerHTML = `
+        <div class="empty-state">
+            <div class="empty-state-icon"><i data-lucide="loader" class="lucide-spin" style="width: 48px; height: 48px; color: var(--accent);"></i></div>
+            <div class="empty-state-title">Carregando Base de Conhecimento...</div>
+            <div class="empty-state-desc">Aguarde, buscando dados...</div>
+        </div>`;
+    lucide.createIcons();
+    
     dados = await db.getAll();
     
     if (dados.length === 0) {
@@ -338,6 +346,14 @@ btnAdicionar.addEventListener('click', () => {
 formProcedimento.addEventListener('submit', async (e) => {
     e.preventDefault();
     
+    const btnSubmit = formProcedimento.querySelector('button[type="submit"]');
+    const originalText = btnSubmit.innerHTML;
+    btnSubmit.disabled = true;
+    btnSubmit.style.opacity = '0.7';
+    btnSubmit.style.cursor = 'not-allowed';
+    btnSubmit.innerHTML = '<i data-lucide="loader" class="lucide-spin" style="width: 15px; margin-right: 6px;"></i> Salvando...';
+    lucide.createIcons();
+    
     const idExistente = erroIdInput.value;
     const novoRegistro = {
         id: idExistente ? parseInt(idExistente) : Date.now(),
@@ -365,6 +381,12 @@ formProcedimento.addEventListener('submit', async (e) => {
     } catch (error) {
         mostrarToast('Erro ao salvar no banco de dados.', 'error');
         console.error(error);
+    } finally {
+        btnSubmit.disabled = false;
+        btnSubmit.style.opacity = '1';
+        btnSubmit.style.cursor = 'pointer';
+        btnSubmit.innerHTML = originalText;
+        lucide.createIcons();
     }
 });
 

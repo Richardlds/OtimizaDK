@@ -71,7 +71,7 @@ const db = {
             if (error) throw error;
         } else {
             const all = await this.getAll();
-            const merged = [...all, ...importedItems];
+            const merged = [...$all, ...$importedItems];
             await this.saveAll(merged);
         }
     }
@@ -83,6 +83,7 @@ const db = {
 const cardsContainer = document.getElementById('cardsContainer');
 const searchInput = document.getElementById('searchInput');
 const filtersContainer = document.getElementById('filtersContainer');
+const toggleTagsCheckbox = document.getElementById('toggleTagsCheckbox');
 const filterTipo = document.getElementById('filterTipo');
 const filterEstado = document.getElementById('filterEstado');
 
@@ -623,5 +624,12 @@ if (window.TomSelect) {
     new TomSelect('#estado', {
         create: false,
         placeholder: 'Selecione o Estado'
+    });
+}
+
+// Toggle de Tags
+if (toggleTagsCheckbox && filtersContainer) {
+    toggleTagsCheckbox.addEventListener('change', (e) => {
+        filtersContainer.style.display = e.target.checked ? 'flex' : 'none';
     });
 }

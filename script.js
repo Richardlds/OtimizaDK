@@ -8,72 +8,132 @@
 // ==========================================
 // Coloque sua URL e Chave aqui para que o sistema ative a nuvem automaticamente!
 // (Se ficar vazio, o sistema continuará usando o LocalStorage do navegador)
-const SUPABASE_URL = 'https://dgbmzbacviyylvpuirno.supabase.co'; 
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRnYm16YmFjdml5eWx2cHVpcm5vIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ3NDAzNjEsImV4cCI6MjEwMDMxNjM2MX0.gP65OFMFSLtSKF1autWL8Z8YxzLzzBaEeKBztM7v0Qk';
+const SUPABASE_URL = 'https://ndiwpvlropelnsvtbsng.supabase.co'; 
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5kaXdwdmxyb3BlbG5zdnRic25nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAzMDI4NDIsImV4cCI6MjA4NTg3ODg0Mn0.Sf5iXn6bHkWXAz62t8Kh9BB404OXc1OJ01kLejqLAWc';
 
 let supabaseClient = null;
+let modoOffline = false;
+
 if (SUPABASE_URL && SUPABASE_KEY && window.supabase) {
-    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    console.log('⚡ Supabase Conectado!');
+    try {
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+            auth: {
+                persistSession: false // Previne avisos de Tracking Prevention do navegador para storage de terceiros
+            }
+        });
+        console.log('⚡ Supabase Inicializado (tentando conexão)...');
+    } catch (err) {
+        console.warn('⚠️ Falha ao instanciar o Supabase:', err);
+        supabaseClient = null;
+    }
 }
 
 const STORAGE_KEY = 'otimizadk_dados';
 
-// Camada de Abstração Híbrida (Supabase ou LocalStorage)
-const db = {
-    async getAll() {
-        if (supabaseClient) {
-            const { data, error } = await supabaseClient.from('procedimentos').select('*').order('id', { ascending: false });
-            if (error) throw error;
-            return data || [];
-        }
+// Helpers seguros para LocalStorage (previne exceções caso o navegador restrinja storage)
+function getLocalDados() {
+    try {
         const storage = localStorage.getItem(STORAGE_KEY);
         return storage ? JSON.parse(storage) : [];
+    } catch (e) {
+        console.warn('⚠️ Falha ao ler LocalStorage:', e);
+        return [];
+    }
+}
+
+function setLocalDados(items) {
+    try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+    } catch (e) {
+        console.warn('⚠️ Falha ao gravar no LocalStorage:', e);
+    }
+}
+
+// Camada de Abstração Híbrida (Supabase com fallback automático para LocalStorage)
+const db = {
+    async getAll() {
+        if (supabaseClient && !modoOffline) {
+            try {
+                const { data, error } = await supabaseClient.from('procedimentos').select('*').order('id', { ascending: false });
+                if (error) throw error;
+                return data || [];
+            } catch (err) {
+                console.warn('⚠️ Supabase indisponível (URL inexistente, projeto pausado ou erro de rede). Alternando para modo LocalStorage:', err.message || err);
+                modoOffline = true;
+                setTimeout(() => {
+                    if (typeof mostrarToast === 'function') {
+                        mostrarToast('Supabase indisponível. Operando no modo local (offline).', 'info');
+                    }
+                }, 500);
+            }
+        }
+        return getLocalDados();
     },
     async saveAll(items) {
-        if (supabaseClient) return; // No supabase, salvamos individualmente.
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+        if (supabaseClient && !modoOffline) return;
+        setLocalDados(items);
     },
     async create(item) {
-        if (supabaseClient) {
-            const { error } = await supabaseClient.from('procedimentos').insert([item]);
-            if (error) throw error;
-        } else {
-            const all = await this.getAll();
-            all.unshift(item);
-            await this.saveAll(all);
+        if (supabaseClient && !modoOffline) {
+            try {
+                const { error } = await supabaseClient.from('procedimentos').insert([item]);
+                if (error) throw error;
+                return;
+            } catch (err) {
+                console.warn('⚠️ Erro ao salvar no Supabase. Salvando localmente:', err);
+                modoOffline = true;
+                if (typeof mostrarToast === 'function') mostrarToast('Erro no Supabase. Salvando no modo local.', 'info');
+            }
         }
+        const all = await this.getAll();
+        all.unshift(item);
+        await this.saveAll(all);
     },
     async update(id, updatedItem) {
-        if (supabaseClient) {
-            const { error } = await supabaseClient.from('procedimentos').update(updatedItem).eq('id', id);
-            if (error) throw error;
-        } else {
-            const all = await this.getAll();
-            const index = all.findIndex(d => d.id === id);
-            if (index > -1) all[index] = updatedItem;
-            await this.saveAll(all);
+        if (supabaseClient && !modoOffline) {
+            try {
+                const { error } = await supabaseClient.from('procedimentos').update(updatedItem).eq('id', id);
+                if (error) throw error;
+                return;
+            } catch (err) {
+                console.warn('⚠️ Erro ao atualizar no Supabase. Atualizando localmente:', err);
+                modoOffline = true;
+            }
         }
+        const all = await this.getAll();
+        const index = all.findIndex(d => d.id === id);
+        if (index > -1) all[index] = updatedItem;
+        await this.saveAll(all);
     },
     async delete(id) {
-        if (supabaseClient) {
-            const { error } = await supabaseClient.from('procedimentos').delete().eq('id', id);
-            if (error) throw error;
-        } else {
-            const all = await this.getAll();
-            const filtered = all.filter(d => d.id !== id);
-            await this.saveAll(filtered);
+        if (supabaseClient && !modoOffline) {
+            try {
+                const { error } = await supabaseClient.from('procedimentos').delete().eq('id', id);
+                if (error) throw error;
+                return;
+            } catch (err) {
+                console.warn('⚠️ Erro ao excluir no Supabase. Excluindo localmente:', err);
+                modoOffline = true;
+            }
         }
+        const all = await this.getAll();
+        const filtered = all.filter(d => d.id !== id);
+        await this.saveAll(filtered);
     },
     async importData(importedItems) {
-        if (supabaseClient) {
-            const { error } = await supabaseClient.from('procedimentos').insert(importedItems);
-            if (error) throw error;
-        } else {
-            const all = await this.getAll();
-            const merged = [...$all, ...$importedItems];
-            await this.saveAll(merged);
+        if (supabaseClient && !modoOffline) {
+            try {
+                const { error } = await supabaseClient.from('procedimentos').insert(importedItems);
+                if (error) throw error;
+                return;
+            } catch (err) {
+                console.warn('⚠️ Erro ao importar no Supabase. Importando localmente:', err);
+                modoOffline = true;
+            }
         }
+        const all = await this.getAll();
+        const merged = [...all, ...importedItems];
+        await this.saveAll(merged);
     }
 };
 
@@ -137,9 +197,14 @@ async function init() {
         </div>`;
     lucide.createIcons();
     
-    dados = await db.getAll();
+    try {
+        dados = await db.getAll();
+    } catch (err) {
+        console.error('Erro ao carregar dados:', err);
+        dados = getLocalDados();
+    }
     
-    if (dados.length === 0) {
+    if (!dados || dados.length === 0) {
         const mockData = [
             {
                 id: Date.now(),

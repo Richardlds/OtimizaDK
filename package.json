@@ -3,7 +3,6 @@
   "version": "1.4.0",
   "description": "Base de Conhecimento OTIMIZADK com suporte a Supabase e Inteligência Artificial",
   "scripts": {
-    "build": "echo 'Static deployment ready'",
     "start": "node server.js",
     "dev": "node server.js"
   },

@@ -33,9 +33,11 @@
     <!-- Sidebar -->
     <aside class="sidebar" id="sidebar">
         <div class="sidebar-logo">
-            <span class="logo-icon"><i data-lucide="zap"></i></span>
-            <span class="logo-text">OTIMIZADK</span>
-            <span class="logo-kb">KB</span>
+            <div class="logo-icon-wrap"><i data-lucide="zap"></i></div>
+            <div class="logo-text-group">
+                <span class="logo-text">OTIMIZADK</span>
+                <span class="logo-sub">Knowledge Hub</span>
+            </div>
         </div>
         
         <nav class="sidebar-nav">
@@ -44,10 +46,24 @@
                 Conhecimento
             </button>
             <div class="nav-divider"></div>
+
+            <div class="sidebar-meta-card">
+                <div class="sidebar-meta-row">
+                    <span class="meta-label">Procedimentos</span>
+                    <span class="meta-count" id="sidebarMetaCount">0</span>
+                </div>
+                <div class="sidebar-meta-status">
+                    <span class="status-indicator-dot" id="dbStatusDot"></span>
+                    <span id="sidebarStatusText">Conectando...</span>
+                </div>
+            </div>
         </nav>
         
         <div class="sidebar-footer">
-            <span class="version-tag">v1.3.0</span>
+            <span class="version-tag">v1.4.0</span>
+            <button class="theme-toggle" id="btnOpenAiConfig" title="Configurações de IA">
+                <i data-lucide="bot" style="color: var(--accent);"></i>
+            </button>
             <button class="theme-toggle" id="themeToggle" title="Trocar Tema">
                 <i data-lucide="moon"></i>
             </button>
@@ -61,6 +77,12 @@
             <h1 class="page-title">Base de Conhecimento</h1>
             
             <div class="topbar-right">
+                <button class="btn-ai-search-trigger" id="btnOpenAiSearch" title="Busca com IA na Base (Ctrl+K)">
+                    <i data-lucide="sparkles" style="width: 15px; margin-right: 6px;"></i>
+                    <span>Busca com IA</span>
+                    <kbd class="ai-kbd">Ctrl K</kbd>
+                </button>
+
                 <div class="search-wrapper" id="searchWrapper">
                     <span class="search-icon" style="display:flex; align-items:center;"><i data-lucide="search" style="width: 16px;"></i></span>
                     <input type="text" class="global-search" id="searchInput" placeholder="Pesquisar procedimentos...">
@@ -77,52 +99,88 @@
         <!-- Page Content -->
         <div class="page active" id="page-knowledge">
             
-            <div class="search-filters-row" style="padding: 0 0 16px 0; border: none; gap: 12px; display: flex; align-items: center; flex-wrap: wrap;">
-                <select id="filterTipo" class="form-group select" style="width: auto; padding: 7px 12px; border-radius: var(--radius-sm); background: var(--bg-2); border: 1px solid var(--border); color: var(--text-primary); outline: none; font-family: var(--font-mono); font-size: 13px; cursor: pointer;">
-                    <option value="">Todos os Tipos</option>
-                    <option value="Erro">Apenas Erros</option>
-                    <option value="Procedimento">Apenas Procedimentos</option>
-                    <option value="FAQ">Dúvidas / FAQ</option>
-                </select>
-                
-                <select id="filterEstado" class="form-group select" style="width: auto; padding: 7px 12px; border-radius: var(--radius-sm); background: var(--bg-2); border: 1px solid var(--border); color: var(--text-primary); outline: none; font-family: var(--font-mono); font-size: 13px; cursor: pointer;">
-                    <option value="">Todos os Estados</option>
-                    <option value="Nacional">Nacional (Todos)</option>
-                    <option value="AC">Acre (AC)</option>
-                    <option value="AL">Alagoas (AL)</option>
-                    <option value="AP">Amapá (AP)</option>
-                    <option value="AM">Amazonas (AM)</option>
-                    <option value="BA">Bahia (BA)</option>
-                    <option value="CE">Ceará (CE)</option>
-                    <option value="DF">Distrito Federal (DF)</option>
-                    <option value="ES">Espírito Santo (ES)</option>
-                    <option value="GO">Goiás (GO)</option>
-                    <option value="MA">Maranhão (MA)</option>
-                    <option value="MT">Mato Grosso (MT)</option>
-                    <option value="MS">Mato Grosso do Sul (MS)</option>
-                    <option value="MG">Minas Gerais (MG)</option>
-                    <option value="PA">Pará (PA)</option>
-                    <option value="PB">Paraíba (PB)</option>
-                    <option value="PR">Paraná (PR)</option>
-                    <option value="PE">Pernambuco (PE)</option>
-                    <option value="PI">Piauí (PI)</option>
-                    <option value="RJ">Rio de Janeiro (RJ)</option>
-                    <option value="RN">Rio Grande do Norte (RN)</option>
-                    <option value="RS">Rio Grande do Sul (RS)</option>
-                    <option value="RO">Rondônia (RO)</option>
-                    <option value="RR">Roraima (RR)</option>
-                    <option value="SC">Santa Catarina (SC)</option>
-                    <option value="SP">São Paulo (SP)</option>
-                    <option value="SE">Sergipe (SE)</option>
-                    <option value="TO">Tocantins (TO)</option>
-                </select>
+            <!-- Cabeçalho Interno da Página -->
+            <div class="page-header-bar">
+                <div class="page-header-text">
+                    <h2 class="page-headline">Catálogo de Procedimentos</h2>
+                    <p class="page-subline">Soluções rápidas, manuais e diagnósticos para suporte técnico</p>
+                </div>
+                <div class="page-stats-pill">
+                    <i data-lucide="sparkles" style="width: 14px; color: var(--accent);"></i>
+                    <span id="activeCountDisplay">0 procedimentos</span>
+                </div>
             </div>
 
-            <div class="tags-toggle-container" style="margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
-                <input type="checkbox" id="toggleTagsCheckbox" style="cursor: pointer;">
-                <label for="toggleTagsCheckbox" style="color: var(--text-secondary); font-size: 14px; cursor: pointer; user-select: none;">Exibir lista de tags</label>
+            <!-- Abas de Acesso Rápido -->
+            <div class="quick-access-wrapper">
+                <div class="quick-tabs" id="quickTabs">
+                    <button type="button" class="quick-tab active" data-tipo="" id="tabAll">
+                        <i data-lucide="layers" style="width: 15px;"></i>
+                        <span>Todos</span>
+                        <span class="quick-tab-badge" id="badgeCountAll">0</span>
+                    </button>
+                    <button type="button" class="quick-tab tab-erro" data-tipo="Erro" id="tabErro">
+                        <i data-lucide="alert-triangle" style="width: 15px;"></i>
+                        <span>Erros / Falhas</span>
+                        <span class="quick-tab-badge badge-erro-bg" id="badgeCountErro">0</span>
+                    </button>
+                    <button type="button" class="quick-tab tab-procedimento" data-tipo="Procedimento" id="tabProc">
+                        <i data-lucide="book-open" style="width: 15px;"></i>
+                        <span>Procedimentos</span>
+                        <span class="quick-tab-badge badge-proc-bg" id="badgeCountProc">0</span>
+                    </button>
+                    <button type="button" class="quick-tab tab-faq" data-tipo="FAQ" id="tabFaq">
+                        <i data-lucide="help-circle" style="width: 15px;"></i>
+                        <span>Dúvidas & FAQ</span>
+                        <span class="quick-tab-badge badge-faq-bg" id="badgeCountFaq">0</span>
+                    </button>
+                </div>
+
+                <div class="quick-filters-controls">
+                    <div class="quick-estado-wrap">
+                        <i data-lucide="map-pin" class="quick-estado-icon"></i>
+                        <select id="filterEstado" class="form-group select">
+                            <option value="">Todos os Estados</option>
+                            <option value="Nacional">Nacional (Todos)</option>
+                            <option value="AC">Acre (AC)</option>
+                            <option value="AL">Alagoas (AL)</option>
+                            <option value="AP">Amapá (AP)</option>
+                            <option value="AM">Amazonas (AM)</option>
+                            <option value="BA">Bahia (BA)</option>
+                            <option value="CE">Ceará (CE)</option>
+                            <option value="DF">Distrito Federal (DF)</option>
+                            <option value="ES">Espírito Santo (ES)</option>
+                            <option value="GO">Goiás (GO)</option>
+                            <option value="MA">Maranhão (MA)</option>
+                            <option value="MT">Mato Grosso (MT)</option>
+                            <option value="MS">Mato Grosso do Sul (MS)</option>
+                            <option value="MG">Minas Gerais (MG)</option>
+                            <option value="PA">Pará (PA)</option>
+                            <option value="PB">Paraíba (PB)</option>
+                            <option value="PR">Paraná (PR)</option>
+                            <option value="PE">Pernambuco (PE)</option>
+                            <option value="PI">Piauí (PI)</option>
+                            <option value="RJ">Rio de Janeiro (RJ)</option>
+                            <option value="RN">Rio Grande do Norte (RN)</option>
+                            <option value="RS">Rio Grande do Sul (RS)</option>
+                            <option value="RO">Rondônia (RO)</option>
+                            <option value="RR">Roraima (RR)</option>
+                            <option value="SC">Santa Catarina (SC)</option>
+                            <option value="SP">São Paulo (SP)</option>
+                            <option value="SE">Sergipe (SE)</option>
+                            <option value="TO">Tocantins (TO)</option>
+                        </select>
+                    </div>
+
+                    <button type="button" class="btn-quick-tags" id="btnToggleTagsBar">
+                        <i data-lucide="tag" style="width: 14px;"></i>
+                        <span>Tags</span>
+                        <span class="tags-badge" id="tagsCountBadge">0</span>
+                    </button>
+                </div>
             </div>
 
+            <!-- Barra de Tags Expansível -->
             <div class="filters-bar" id="filtersContainer" style="display: none;">
                 <!-- Chips gerados dinamicamente -->
             </div>
@@ -145,6 +203,30 @@
                 <form id="formProcedimento">
                     <input type="hidden" id="erroId">
                     
+                    <!-- Assistente de IA para Criar / Aprimorar Procedimento -->
+                    <div class="ai-generator-panel">
+                        <div class="ai-generator-header">
+                            <div class="ai-generator-title">
+                                <i data-lucide="sparkles" class="ai-sparkle-icon"></i>
+                                <span>Assistente de IA OtimizaDK</span>
+                            </div>
+                            <span class="ai-badge-pill">Gemini & OpenAI</span>
+                        </div>
+                        <p class="ai-generator-desc">
+                            Digite um título/problema e a IA preencherá automaticamente o contexto, passos de resolução, categoria e tags.
+                        </p>
+                        <div class="ai-generator-actions">
+                            <button type="button" class="btn-ai-action" id="btnAiGerarProcedimento">
+                                <i data-lucide="wand-2" style="width: 14px; margin-right: 6px;"></i>
+                                Gerar Procedimento Completo
+                            </button>
+                            <button type="button" class="btn-ai-action-subtle" id="btnAiAprimorarSolucao" title="Formatar e aprimorar a resolução digitada">
+                                <i data-lucide="list-checks" style="width: 14px; margin-right: 6px;"></i>
+                                Aprimorar Solução
+                            </button>
+                        </div>
+                    </div>
+
                     <div class="form-group">
                         <label>Título / Problema</label>
                         <input type="text" id="nomeErro" required placeholder="Ex: Falha na impressora fiscal">
@@ -196,7 +278,13 @@
                     </div>
                     
                     <div class="form-group">
-                        <label>Tags (Opcional, separadas por vírgula)</label>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                            <label style="margin-bottom: 0;">Tags (Opcional, separadas por vírgula)</label>
+                            <button type="button" class="btn-ai-tag" id="btnAiGerarTags" title="Gerar tags automáticas com base no título e conteúdo">
+                                <i data-lucide="sparkles" style="width: 12px; margin-right: 4px;"></i>
+                                Gerar Tags com IA
+                            </button>
+                        </div>
                         <input type="text" id="tags" placeholder="pdv, impressora, wifi">
                     </div>
 
@@ -259,9 +347,147 @@
         </div>
     </div>
 
+    <!-- Modal Busca Inteligente com IA -->
+    <div class="modal-overlay" id="modalAiSearch">
+        <div class="modal modal-large ai-search-modal">
+            <div class="modal-header">
+                <div class="modal-title-row" style="display:flex; align-items:center; gap:10px;">
+                    <div class="ai-icon-bubble"><i data-lucide="sparkles"></i></div>
+                    <div>
+                        <h2 style="margin-bottom: 2px;">Busca com IA na Base</h2>
+                        <span style="font-size: 12px; color: var(--text-secondary);">Consulte em linguagem natural para obter resoluções imediatas da base</span>
+                    </div>
+                </div>
+                <button class="modal-close" id="closeAiSearchModal"><i data-lucide="x" style="width: 20px;"></i></button>
+            </div>
+            
+            <div class="modal-body" style="padding-top: 14px;">
+                <div class="ai-search-input-box">
+                    <input type="text" id="aiSearchInput" class="ai-search-field" placeholder="Ex: Como resolver lentidão no checkout ou resetar senha do AD?">
+                    <button type="button" class="btn-ai-search-submit" id="btnExecAiSearch">
+                        <i data-lucide="send" style="width: 15px; margin-right: 4px;"></i> Perguntar
+                    </button>
+                </div>
+
+                <div class="ai-search-suggestions">
+                    <span class="ai-suggest-label">Sugestões:</span>
+                    <button type="button" class="ai-chip-suggestion" data-query="Erro 500 no servidor de produção">Erro 500 servidor</button>
+                    <button type="button" class="ai-chip-suggestion" data-query="Reset de Senha AD">Reset Senha AD</button>
+                    <button type="button" class="ai-chip-suggestion" data-query="Procedimentos exclusivos do estado de SP">Procedimentos SP</button>
+                </div>
+
+                <!-- Estado de Carregamento -->
+                <div id="aiSearchLoading" class="ai-search-loading" style="display: none;">
+                    <div class="ai-loading-spinner">
+                        <i data-lucide="sparkles" class="lucide-spin" style="width: 28px; height: 28px; color: var(--accent);"></i>
+                    </div>
+                    <p class="ai-loading-text">Consultando base de conhecimento e gerando resposta...</p>
+                </div>
+
+                <!-- Resposta da IA -->
+                <div id="aiSearchOutput" class="ai-search-output" style="display: none;">
+                    <div class="ai-answer-card">
+                        <div class="ai-answer-header">
+                            <span class="ai-badge-answer"><i data-lucide="bot" style="width: 13px; margin-right: 4px;"></i> Resposta da IA</span>
+                            <button type="button" class="btn-secondary" id="btnCopiarRespostaIa" style="padding: 4px 10px; font-size: 11px;">
+                                <i data-lucide="copy" style="width: 12px; margin-right: 4px;"></i> Copiar
+                            </button>
+                        </div>
+                        <div class="ai-answer-text" id="aiAnswerText"></div>
+                    </div>
+
+                    <!-- Procedimentos Relacionados Encontrados -->
+                    <div class="ai-sources-section">
+                        <h4 class="ai-sources-title">
+                            <i data-lucide="layers" style="width: 14px; margin-right: 6px;"></i>
+                            Procedimentos Relacionados na Base:
+                        </h4>
+                        <div class="ai-sources-grid" id="aiSourcesGrid">
+                            <!-- Injetado dinamicamente -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Configurações de IA -->
+    <div class="modal-overlay" id="modalAiConfig">
+        <div class="modal ai-config-modal">
+            <div class="modal-header">
+                <div class="modal-title-row" style="display:flex; align-items:center; gap:8px;">
+                    <div class="ai-icon-bubble"><i data-lucide="settings"></i></div>
+                    <h2>Configurações de Inteligência Artificial</h2>
+                </div>
+                <button class="modal-close" id="closeAiConfigModal"><i data-lucide="x" style="width: 20px;"></i></button>
+            </div>
+            
+            <div class="modal-body">
+                <form id="formAiConfig">
+                    <div class="form-group">
+                        <label>Provedor de IA</label>
+                        <select id="aiProviderSelect" class="form-group select">
+                            <option value="gemini">Google Gemini (Recomendado - Gratuito)</option>
+                            <option value="openai">OpenAI / Groq / OpenRouter / Compatível</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Chave de API (API Key)</label>
+                        <div style="display: flex; gap: 8px;">
+                            <input type="password" id="aiApiKeyInput" placeholder="Cole sua chave aqui (ex: AIzaSy... ou sk-...)" style="flex: 1;">
+                            <button type="button" class="btn-secondary" id="btnToggleShowKey" title="Exibir/Ocultar Chave" style="padding: 0 12px;">
+                                <i data-lucide="eye" style="width: 16px;"></i>
+                            </button>
+                        </div>
+                        <span class="input-hint" id="aiKeyHint" style="font-size: 11px; color: var(--text-secondary); margin-top: 5px; display: block;">
+                            Obtenha uma chave gratuita em <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" style="color: var(--accent); text-decoration: underline;">Google AI Studio</a>.
+                        </span>
+                    </div>
+
+                    <div class="form-group" id="aiModelGroup">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                            <label style="margin-bottom: 0;">Modelo de IA</label>
+                            <button type="button" class="btn-secondary" id="btnDetectarModelos" style="padding: 2px 8px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;" title="Buscar modelos autorizados para sua chave no Google">
+                                <i data-lucide="refresh-cw" style="width: 12px;"></i> Detectar Modelos
+                            </button>
+                        </div>
+                        <select id="aiModelSelect" class="form-group select" style="width: 100%; margin-bottom: 6px;">
+                            <option value="gemini-2.0-flash">gemini-2.0-flash (Recomendado - Moderno e Rápido)</option>
+                            <option value="gemini-2.5-flash">gemini-2.5-flash</option>
+                            <option value="gemini-1.5-flash-latest">gemini-1.5-flash-latest</option>
+                            <option value="gemini-1.5-flash-8b">gemini-1.5-flash-8b</option>
+                            <option value="gemini-1.5-pro">gemini-1.5-pro</option>
+                            <option value="custom">Outro modelo (digitar manualmente)...</option>
+                        </select>
+                        <input type="text" id="aiModelInput" placeholder="ex: gemini-2.0-flash" value="gemini-2.0-flash" style="display: none;">
+                    </div>
+
+                    <div class="form-group" id="aiEndpointGroup" style="display: none;">
+                        <label>Endpoint Customizado (Opcional)</label>
+                        <input type="text" id="aiEndpointInput" placeholder="https://api.openai.com/v1/chat/completions">
+                    </div>
+
+                    <div id="aiTestStatus" style="display: none; padding: 10px; border-radius: var(--radius-sm); font-size: 13px; margin-bottom: 15px;"></div>
+
+                    <div class="modal-footer" style="padding-top: 10px; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+                        <button type="button" class="btn-secondary" id="btnTestAiKey">
+                            <i data-lucide="activity" style="width: 14px; margin-right: 4px;"></i> Testar Conexão
+                        </button>
+                        <div style="display: flex; gap: 8px;">
+                            <button type="button" class="btn-secondary" id="btnCancelAiConfig">Cancelar</button>
+                            <button type="submit" class="btn-primary" id="btnSaveAiConfig">Salvar</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- Container de Toasts para Alertas -->
     <div class="toast-container" id="toastContainer"></div>
 
+    <script src="ai-service.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

@@ -1,29 +1,19 @@
 /**
- * OTIMIZADK - AI Service
- * Integração com Google Gemini (padrão) e OpenAI / Groq / Provedores compatíveis.
+ * OTIMIZADK - AI Service (Serviço de Inteligência Artificial)
+ * Integração com Google Gemini (padrão com Visão Multimodal) e OpenAI / Groq / Provedores compatíveis.
  * Executado 100% no cliente sem expor chaves no repositório.
  */
-
-const AI_CONFIG_KEY = 'otimizadk_ai_config';
-
-// Configuração padrão
-const DEFAULT_AI_CONFIG = {
-    provider: 'gemini', // 'gemini' | 'openai'
-    apiKey: '',
-    model: 'gemini-2.0-flash', // gemini-2.0-flash (recomendado), gemini-2.5-flash, gemini-1.5-flash-latest, gpt-4o-mini
-    customEndpoint: ''
-};
 
 const aiService = {
     // Carrega configuração salva
     getConfig() {
         try {
-            const raw = localStorage.getItem(AI_CONFIG_KEY);
-            if (!raw) return { ...DEFAULT_AI_CONFIG };
-            return { ...DEFAULT_AI_CONFIG, ...JSON.parse(raw) };
+            const raw = localStorage.getItem(window.CONFIG ? window.CONFIG.STORAGE_KEYS.AI_CONFIG : 'otimizadk_ai_config');
+            if (!raw) return { ...(window.CONFIG ? window.CONFIG.DEFAULT_AI : {}) };
+            return { ...(window.CONFIG ? window.CONFIG.DEFAULT_AI : {}), ...JSON.parse(raw) };
         } catch (e) {
             console.error('Erro ao ler configuração de IA:', e);
-            return { ...DEFAULT_AI_CONFIG };
+            return { ...(window.CONFIG ? window.CONFIG.DEFAULT_AI : {}) };
         }
     },
 
@@ -31,7 +21,8 @@ const aiService = {
     saveConfig(newConfig) {
         const current = this.getConfig();
         const updated = { ...current, ...newConfig };
-        localStorage.setItem(AI_CONFIG_KEY, JSON.stringify(updated));
+        const key = window.CONFIG ? window.CONFIG.STORAGE_KEYS.AI_CONFIG : 'otimizadk_ai_config';
+        localStorage.setItem(key, JSON.stringify(updated));
         return updated;
     },
 
@@ -68,7 +59,7 @@ const aiService = {
         return models;
     },
 
-    // Chamada de baixo nível ao provedor
+    // Chamada de baixo nível ao provedor (Texto puro)
     async call(prompt, systemInstruction = '') {
         const config = this.getConfig();
         if (!config.apiKey || !config.apiKey.trim()) {
@@ -82,7 +73,21 @@ const aiService = {
         }
     },
 
-    // Chamada à API REST do Google Gemini
+    // Chamada de baixo nível com suporte a Imagens (Multimodal Vision)
+    async callVision(prompt, systemInstruction = '', imagensBase64 = []) {
+        const config = this.getConfig();
+        if (!config.apiKey || !config.apiKey.trim()) {
+            throw new Error('CHAVE_NAO_CONFIGURADA');
+        }
+
+        if (config.provider === 'gemini') {
+            return await this._callGeminiVision(prompt, systemInstruction, imagensBase64, config);
+        } else {
+            return await this._callOpenAIVision(prompt, systemInstruction, imagensBase64, config);
+        }
+    },
+
+    // Chamada à API REST do Google Gemini (Texto)
     async _callGemini(prompt, systemInstruction, config) {
         let rawModel = (config.model || 'gemini-2.0-flash').replace(/^models\//, '');
         let url = `https://generativelanguage.googleapis.com/v1beta/models/${rawModel}:generateContent?key=${encodeURIComponent(config.apiKey.trim())}`;
@@ -108,37 +113,25 @@ const aiService = {
 
         let response = await fetch(url, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(requestBody)
         });
 
-        // Caso o modelo solicitado não exista (404/400), tenta fallback automático com os modelos disponíveis da chave
+        // Caso o modelo solicitado não exista (404/400), tenta fallback automático
         if (!response.ok && (response.status === 404 || response.status === 400)) {
             try {
                 const disponiveis = await this.listarModelosGemini(config.apiKey);
-                const prioridades = [
-                    'gemini-2.0-flash',
-                    'gemini-2.5-flash',
-                    'gemini-1.5-flash-latest',
-                    'gemini-1.5-flash-8b',
-                    'gemini-1.5-pro',
-                    'gemini-pro'
-                ];
+                const prioridades = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-1.5-flash-latest', 'gemini-1.5-pro'];
                 const fallback = prioridades.find(p => disponiveis.includes(p) && p !== rawModel) 
                     || disponiveis.find(p => p !== rawModel);
 
                 if (fallback) {
-                    console.warn(`⚠️ Modelo ${rawModel} não suportado. Alternando automaticamente para ${fallback}...`);
                     this.saveConfig({ model: fallback });
                     rawModel = fallback;
                     url = `https://generativelanguage.googleapis.com/v1beta/models/${rawModel}:generateContent?key=${encodeURIComponent(config.apiKey.trim())}`;
                     response = await fetch(url, {
                         method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
+                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(requestBody)
                     });
                 }
@@ -165,20 +158,6 @@ const aiService = {
         return candidate.content.parts[0].text;
     },
 
-    // Chamada de baixo nível com suporte a Imagens (Multimodal Vision)
-    async callVision(prompt, systemInstruction = '', imagensBase64 = []) {
-        const config = this.getConfig();
-        if (!config.apiKey || !config.apiKey.trim()) {
-            throw new Error('CHAVE_NAO_CONFIGURADA');
-        }
-
-        if (config.provider === 'gemini') {
-            return await this._callGeminiVision(prompt, systemInstruction, imagensBase64, config);
-        } else {
-            return await this._callOpenAIVision(prompt, systemInstruction, imagensBase64, config);
-        }
-    },
-
     // Chamada Multimodal à API REST do Google Gemini
     async _callGeminiVision(prompt, systemInstruction, imagensBase64, config) {
         let rawModel = (config.model || 'gemini-2.0-flash').replace(/^models\//, '');
@@ -197,7 +176,6 @@ const aiService = {
                     }
                 });
             } else if (imgDataUrl.startsWith('http')) {
-                // Para URLs simples, pode incluir como texto se necessário
                 parts.push({ text: `[Imagem de Referência: ${imgDataUrl}]` });
             }
         });
@@ -227,7 +205,7 @@ const aiService = {
             body: JSON.stringify(requestBody)
         });
 
-        // Fallback automático se o modelo falhar
+        // Fallback automático
         if (!response.ok && (response.status === 404 || response.status === 400)) {
             try {
                 const disponiveis = await this.listarModelosGemini(config.apiKey);
@@ -264,6 +242,48 @@ const aiService = {
         }
 
         return candidate.content.parts[0].text;
+    },
+
+    // Chamada à API da OpenAI ou compatíveis (Texto)
+    async _callOpenAI(prompt, systemInstruction, config) {
+        const endpoint = config.customEndpoint && config.customEndpoint.trim() 
+            ? config.customEndpoint.trim() 
+            : 'https://api.openai.com/v1/chat/completions';
+        
+        const model = config.model || 'gpt-4o-mini';
+
+        const messages = [];
+        if (systemInstruction) {
+            messages.push({ role: 'system', content: systemInstruction });
+        }
+        messages.push({ role: 'user', content: prompt });
+
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${config.apiKey.trim()}`
+            },
+            body: JSON.stringify({
+                model: model,
+                messages: messages,
+                temperature: 0.3
+            })
+        });
+
+        if (!response.ok) {
+            let errorMsg = `Erro na API OpenAI (${response.status})`;
+            try {
+                const errData = await response.json();
+                if (errData.error && errData.error.message) {
+                    errorMsg = errData.error.message;
+                }
+            } catch (_) {}
+            throw new Error(errorMsg);
+        }
+
+        const data = await response.json();
+        return data.choices?.[0]?.message?.content || '';
     },
 
     // Chamada Multimodal à API OpenAI ou compatíveis
@@ -318,48 +338,6 @@ const aiService = {
         return data.choices?.[0]?.message?.content || '';
     },
 
-    // Chamada à API da OpenAI ou compatíveis (Groq, OpenRouter, etc.)
-    async _callOpenAI(prompt, systemInstruction, config) {
-        const endpoint = config.customEndpoint && config.customEndpoint.trim() 
-            ? config.customEndpoint.trim() 
-            : 'https://api.openai.com/v1/chat/completions';
-        
-        const model = config.model || 'gpt-4o-mini';
-
-        const messages = [];
-        if (systemInstruction) {
-            messages.push({ role: 'system', content: systemInstruction });
-        }
-        messages.push({ role: 'user', content: prompt });
-
-        const response = await fetch(endpoint, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${config.apiKey.trim()}`
-            },
-            body: JSON.stringify({
-                model: model,
-                messages: messages,
-                temperature: 0.3
-            })
-        });
-
-        if (!response.ok) {
-            let errorMsg = `Erro na API OpenAI (${response.status})`;
-            try {
-                const errData = await response.json();
-                if (errData.error && errData.error.message) {
-                    errorMsg = errData.error.message;
-                }
-            } catch (_) {}
-            throw new Error(errorMsg);
-        }
-
-        const data = await response.json();
-        return data.choices?.[0]?.message?.content || '';
-    },
-
     // Teste de Conexão com a chave
     async testConnection(testConfig) {
         const config = testConfig || this.getConfig();
@@ -368,29 +346,19 @@ const aiService = {
         }
 
         if (config.provider === 'gemini') {
-            // 1. Obtém lista real de modelos autorizados para esta chave
             const modelosDisponiveis = await this.listarModelosGemini(config.apiKey);
             if (!modelosDisponiveis || modelosDisponiveis.length === 0) {
                 throw new Error('Nenhum modelo de geração de conteúdo encontrado para esta chave no Gemini.');
             }
 
-            // 2. Se o modelo configurado não existir na lista, escolhe automaticamente o melhor
             let modeloEscolhido = (config.model || '').replace(/^models\//, '');
             if (!modelosDisponiveis.includes(modeloEscolhido)) {
-                const prioridades = [
-                    'gemini-2.0-flash',
-                    'gemini-2.5-flash',
-                    'gemini-1.5-flash-latest',
-                    'gemini-1.5-flash-8b',
-                    'gemini-1.5-pro',
-                    'gemini-pro'
-                ];
+                const prioridades = ['gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-1.5-flash-latest', 'gemini-1.5-pro'];
                 modeloEscolhido = prioridades.find(p => modelosDisponiveis.includes(p)) || modelosDisponiveis[0];
                 config.model = modeloEscolhido;
                 this.saveConfig({ model: modeloEscolhido });
             }
 
-            // 3. Testa geração com o modelo selecionado
             const prompt = 'Responda apenas com a palavra OK.';
             await this._callGemini(prompt, '', config);
 
@@ -412,7 +380,6 @@ const aiService = {
 
     // 1. BUSCA COM IA NA BASE DE CONHECIMENTOS (RAG)
     async buscarComIa(pergunta, listaProcedimentos) {
-        // Formata a base atual como catálogo resumido para o prompt
         const catalogo = listaProcedimentos.map(item => {
             return `--- ID: ${item.id} ---
 Título: ${item.nomeErro}
@@ -440,7 +407,6 @@ Analise a dúvida, encontre os procedimentos correspondentes e responda com a so
 
         const respostaBruta = await this.call(prompt, systemInstruction);
 
-        // Extrai IDs relacionados
         let idsRelacionados = [];
         const matchIds = respostaBruta.match(/\[IDS_RELACIONADOS:\s*([\d\s,]+)\]/i);
         if (matchIds && matchIds[1]) {
@@ -450,10 +416,7 @@ Analise a dúvida, encontre os procedimentos correspondentes e responda com a so
                 .filter(id => !isNaN(id));
         }
 
-        // Remove a tag de IDs do texto exibido ao usuário
         const respostaFormatada = respostaBruta.replace(/\[IDS_RELACIONADOS:.*?\]/gi, '').trim();
-
-        // Filtra os objetos de procedimento correspondentes
         const procedimentosEncontrados = listaProcedimentos.filter(p => idsRelacionados.includes(p.id));
 
         return {
@@ -483,8 +446,6 @@ Formato esperado:
 "${descricaoOuTitulo}"`;
 
         const resposta = await this.call(prompt, systemInstruction);
-        
-        // Limpa possíveis marcações de código markdown ```json ... ```
         const limpo = resposta.replace(/```json/gi, '').replace(/```/g, '').trim();
 
         try {
@@ -498,7 +459,7 @@ Formato esperado:
                 tags: parsed.tags || ''
             };
         } catch (e) {
-            console.warn('Falha ao parsear JSON direto da IA, tentando extração por regex:', e);
+            console.warn('Falha ao parsear JSON direto da IA:', e);
             return {
                 nomeErro: descricaoOuTitulo,
                 tipo: 'Procedimento',
@@ -541,7 +502,6 @@ Solução: ${solucao || 'Não informado'}
 Gere as tags correspondentes:`;
 
         const resposta = await this.call(prompt, systemInstruction);
-        // Limpa a resposta para garantir que apenas palavras separadas por vírgula retornem
         return resposta
             .replace(/[#*`]/g, '')
             .replace(/\n+/g, ', ')
@@ -607,10 +567,9 @@ Realize a leitura do print, identifique a mensagem de erro exata e forneça a so
     }
 };
 
-// Disponibiliza globalmente
 window.aiService = aiService;
 
-// Tenta sincronizar chave do .env via servidor local caso ainda não tenha chave no localStorage
+// Tenta sincronizar chave do .env via servidor local caso ainda não tenha chave
 if (typeof window !== 'undefined') {
     (async function() {
         try {

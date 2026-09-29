@@ -60,7 +60,10 @@
         </nav>
         
         <div class="sidebar-footer">
-            <span class="version-tag">v1.4.0</span>
+            <span class="version-tag">v1.5.0</span>
+            <button class="theme-toggle" id="btnOpenShortcuts" title="Atalhos de Teclado (?)">
+                <i data-lucide="keyboard" style="width: 15px;"></i>
+            </button>
             <button class="theme-toggle" id="btnOpenAiConfig" title="Configurações de IA">
                 <i data-lucide="bot" style="color: var(--accent);"></i>
             </button>
@@ -118,6 +121,11 @@
                         <i data-lucide="layers" style="width: 15px;"></i>
                         <span>Todos</span>
                         <span class="quick-tab-badge" id="badgeCountAll">0</span>
+                    </button>
+                    <button type="button" class="quick-tab tab-favorito" data-tipo="Favoritos" id="tabFavoritos">
+                        <i data-lucide="star" style="width: 15px; color: var(--warning);"></i>
+                        <span>Favoritos</span>
+                        <span class="quick-tab-badge badge-fav-bg" id="badgeCountFav">0</span>
                     </button>
                     <button type="button" class="quick-tab tab-erro" data-tipo="Erro" id="tabErro">
                         <i data-lucide="alert-triangle" style="width: 15px;"></i>
@@ -288,14 +296,36 @@
                         <input type="text" id="tags" placeholder="pdv, impressora, wifi">
                     </div>
 
-                    <div class="form-group">
-                        <label>Anexar Imagem (Opcional - Máx 2MB)</label>
-                        <input type="file" id="imagemUpload" accept="image/*" style="padding: 6px; cursor: pointer; color: var(--text-secondary); font-size: 13px;">
-                        <input type="hidden" id="imagemBase64">
-                        <div id="imagemPreview" style="margin-top: 8px; display: none;">
-                            <img src="" style="max-width: 100%; max-height: 150px; border-radius: var(--radius-sm); border: 1px solid var(--border);">
-                            <button type="button" class="btn-secondary" id="btnRemoverImagem" style="margin-top: 6px; padding: 4px 10px; font-size: 11px;"><i data-lucide="trash" style="width: 12px; margin-right: 4px;"></i> Remover Imagem</button>
+                    <div class="form-group upload-section-wrap">
+                        <div class="upload-section-header">
+                            <label style="margin-bottom: 0; display: flex; align-items: center; gap: 6px;">
+                                <i data-lucide="images" style="width: 15px; color: var(--accent);"></i>
+                                <span>Fotos & Prints do Procedimento</span>
+                                <span class="upload-count-pill" id="uploadCountPill" style="display: none;">0 fotos</span>
+                            </label>
+                            
+                            <button type="button" class="btn-ai-vision" id="btnAiAnalisarPrint" title="A IA analisa as fotos/prints anexados, lê mensagens de erro e preenche a resolução automaticamente" style="display: none;">
+                                <i data-lucide="scan-eye" style="width: 14px; margin-right: 5px;"></i>
+                                Diagnosticar Print com IA
+                            </button>
                         </div>
+
+                        <!-- Dropzone interativa para upload múltiplo e drag & drop -->
+                        <div class="dropzone-box" id="dropZoneFotos">
+                            <input type="file" id="imagemUpload" multiple accept="image/*" style="display: none;">
+                            <div class="dropzone-content">
+                                <div class="dropzone-icon-circle">
+                                    <i data-lucide="upload-cloud"></i>
+                                </div>
+                                <div class="dropzone-text-group">
+                                    <span class="dropzone-title">Arraste e solte várias fotos aqui ou <b>clique para selecionar</b></span>
+                                    <span class="dropzone-sub">Suporta múltiplos prints, JPEG, PNG, WebP • Dica: Use <b>Ctrl + V</b> para colar prints direto da área de transferência!</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Container de Miniaturas de Fotos -->
+                        <div class="form-gallery-grid" id="formGalleryGrid" style="display: none;"></div>
                     </div>
                     
                     <div class="form-group">
@@ -319,29 +349,59 @@
 
     <!-- Modal Visualizar -->
     <div class="modal-overlay" id="modalView">
-        <div class="modal modal-large">
+        <div class="modal modal-large modal-view-custom">
             <div class="modal-header">
                 <h2 id="viewTitle" class="view-title" style="margin-bottom: 0;">Visualizar</h2>
-                <button class="modal-close" id="closeViewModal"><i data-lucide="x" style="width: 20px;"></i></button>
+                <div class="modal-header-actions">
+                    <button type="button" class="icon-btn favorite-btn" id="btnToggleFavoritoView" title="Favoritar / Fixar Procedimento">
+                        <i data-lucide="star" style="width: 16px;"></i>
+                    </button>
+                    <button type="button" class="icon-btn" id="btnImprimirView" title="Imprimir ou Exportar em PDF">
+                        <i data-lucide="printer" style="width: 16px;"></i>
+                    </button>
+                    <button class="modal-close" id="closeViewModal"><i data-lucide="x" style="width: 20px;"></i></button>
+                </div>
             </div>
             
             <div class="modal-body">
-                <div class="card-badges" id="viewTags" style="margin-bottom: 20px;"></div>
+                <div class="card-badges" id="viewTags" style="margin-bottom: 18px;"></div>
                 
+                <!-- Galeria de Imagens / Prints -->
                 <div class="view-section" id="viewImageSection" style="display: none;">
-                    <h3 class="view-section-title">Anexo</h3>
-                    <img id="viewImage" src="" style="max-width: 100%; max-height: 400px; border-radius: var(--radius); border: 1px solid var(--border);">
+                    <div class="view-section-header">
+                        <h3 class="view-section-title" style="margin-bottom: 0;">
+                            <i data-lucide="images" style="width: 15px; margin-right: 6px; color: var(--accent);"></i>
+                            Fotos & Prints (<span id="viewGalleryCount">0</span>)
+                        </h3>
+                        <span class="view-gallery-hint">Clique para ampliar em tela cheia com zoom</span>
+                    </div>
+                    <div class="view-gallery-grid" id="viewGalleryGrid">
+                        <!-- Miniaturas injetadas dinamicamente -->
+                    </div>
                 </div>
 
                 <div class="view-section">
-                    <h3 class="view-section-title">Contexto</h3>
-                    <div class="view-text" id="viewProcedimento"></div>
+                    <h3 class="view-section-title">
+                        <i data-lucide="info" style="width: 14px; margin-right: 6px; color: var(--accent);"></i>
+                        Contexto & Cenário
+                    </h3>
+                    <div class="view-text formatted-text" id="viewProcedimento"></div>
                 </div>
                 
                 <div class="view-section">
-                    <h3 class="view-section-title">Como Resolver</h3>
-                    <div class="view-text" id="viewComoResolver"></div>
-                    <button class="copy-btn" id="btnCopiar"><i data-lucide="copy" style="width: 14px; margin-right: 6px;"></i> Copiar Solução</button>
+                    <h3 class="view-section-title">
+                        <i data-lucide="check-circle-2" style="width: 14px; margin-right: 6px; color: var(--success);"></i>
+                        Como Resolver (Passo a Passo)
+                    </h3>
+                    <div class="view-text formatted-text" id="viewComoResolver"></div>
+                    <div class="view-actions-bar">
+                        <button class="copy-btn" id="btnCopiar">
+                            <i data-lucide="copy" style="width: 14px; margin-right: 6px;"></i> Copiar Solução
+                        </button>
+                        <button class="copy-btn-chat" id="btnCopiarChat" title="Copiar em formato limpo com emojis para colar no WhatsApp, Slack ou Teams">
+                            <i data-lucide="message-square" style="width: 14px; margin-right: 6px;"></i> Copiar p/ WhatsApp / Chat
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -484,10 +544,140 @@
         </div>
     </div>
 
+    <!-- Modal Lightbox (Visualizador de Fotos em Tela Cheia com Zoom) -->
+    <div class="lightbox-overlay" id="modalLightbox">
+        <div class="lightbox-backdrop" id="lightboxBackdrop"></div>
+        
+        <div class="lightbox-topbar">
+            <div class="lightbox-title-group">
+                <span class="lightbox-badge-icon"><i data-lucide="image"></i></span>
+                <span class="lightbox-counter" id="lightboxCounter">1 / 1</span>
+            </div>
+            
+            <div class="lightbox-actions">
+                <button type="button" class="lightbox-btn" id="btnLightboxZoomOut" title="Diminuir Zoom (-)">
+                    <i data-lucide="zoom-out"></i>
+                </button>
+                <button type="button" class="lightbox-btn" id="btnLightboxZoomReset" title="Tamanho Original (100%)">
+                    <span id="lightboxZoomLevel">100%</span>
+                </button>
+                <button type="button" class="lightbox-btn" id="btnLightboxZoomIn" title="Aumentar Zoom (+)">
+                    <i data-lucide="zoom-in"></i>
+                </button>
+                <button type="button" class="lightbox-btn" id="btnLightboxRotate" title="Girar Foto (90°)">
+                    <i data-lucide="rotate-cw"></i>
+                </button>
+                <button type="button" class="lightbox-btn" id="btnLightboxCopy" title="Copiar Imagem">
+                    <i data-lucide="copy"></i>
+                </button>
+                <button type="button" class="lightbox-btn" id="btnLightboxDownload" title="Baixar Imagem">
+                    <i data-lucide="download"></i>
+                </button>
+                <button type="button" class="lightbox-btn close-btn" id="btnCloseLightbox" title="Fechar Visualizador (Esc)">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+        </div>
+
+        <div class="lightbox-stage" id="lightboxStage">
+            <button type="button" class="lightbox-nav-btn prev" id="btnLightboxPrev" title="Foto Anterior (Seta Esquerda)">
+                <i data-lucide="chevron-left"></i>
+            </button>
+            
+            <div class="lightbox-img-wrapper" id="lightboxImgWrapper">
+                <img id="lightboxImage" src="" alt="Imagem Ampliada">
+            </div>
+
+            <button type="button" class="lightbox-nav-btn next" id="btnLightboxNext" title="Próxima Foto (Seta Direita)">
+                <i data-lucide="chevron-right"></i>
+            </button>
+        </div>
+
+        <div class="lightbox-thumbs-strip" id="lightboxThumbsStrip">
+            <!-- Miniaturas da galeria injetadas dinamicamente -->
+        </div>
+    </div>
+
+    <!-- Modal Atalhos de Teclado -->
+    <div class="modal-overlay" id="modalShortcuts">
+        <div class="modal" style="max-width: 460px;">
+            <div class="modal-header">
+                <div class="modal-title-row" style="display: flex; align-items: center; gap: 8px;">
+                    <div class="ai-icon-bubble"><i data-lucide="keyboard"></i></div>
+                    <h2 style="margin-bottom: 0;">Atalhos de Teclado</h2>
+                </div>
+                <button class="modal-close" id="closeShortcutsModal"><i data-lucide="x" style="width: 20px;"></i></button>
+            </div>
+            <div class="modal-body" style="padding-top: 8px;">
+                <div class="shortcuts-grid">
+                    <div class="shortcut-item">
+                        <span class="shortcut-label">Busca com IA na Base</span>
+                        <kbd class="shortcut-key">Ctrl + K</kbd>
+                    </div>
+                    <div class="shortcut-item">
+                        <span class="shortcut-label">Pesquisar na base</span>
+                        <kbd class="shortcut-key">/</kbd>
+                    </div>
+                    <div class="shortcut-item">
+                        <span class="shortcut-label">Novo Procedimento</span>
+                        <kbd class="shortcut-key">N</kbd>
+                    </div>
+                    <div class="shortcut-item">
+                        <span class="shortcut-label">Filtrar Favoritos</span>
+                        <kbd class="shortcut-key">F</kbd>
+                    </div>
+                    <div class="shortcut-item">
+                        <span class="shortcut-label">Colar print de tela</span>
+                        <kbd class="shortcut-key">Ctrl + V</kbd>
+                    </div>
+                    <div class="shortcut-item">
+                        <span class="shortcut-label">Navegar na Galeria</span>
+                        <kbd class="shortcut-key">← e →</kbd>
+                    </div>
+                    <div class="shortcut-item">
+                        <span class="shortcut-label">Fechar Modais / Lightbox</span>
+                        <kbd class="shortcut-key">Esc</kbd>
+                    </div>
+                    <div class="shortcut-item">
+                        <span class="shortcut-label">Abrir este Guia</span>
+                        <kbd class="shortcut-key">?</kbd>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Container de Toasts para Alertas -->
     <div class="toast-container" id="toastContainer"></div>
 
-    <script src="./ai-service.js"></script>
-    <script src="./script.js"></script>
+    <!-- Módulos da Aplicação OtimizaDK -->
+    <!-- 1. Configuração e Utilitários -->
+    <script src="./js/config.js"></script>
+    <script src="./js/utils/toast.js"></script>
+    <script src="./js/utils/image-utils.js"></script>
+    <script src="./js/utils/markdown.js"></script>
+    
+    <!-- 2. Banco de Dados e Estado Global -->
+    <script src="./js/db.js"></script>
+    <script src="./js/state.js"></script>
+    
+    <!-- 3. Serviços de IA (Gemini & OpenAI) -->
+    <script src="./js/services/ai-service.js"></script>
+    
+    <!-- 4. Componentes de Interface -->
+    <script src="./js/components/lightbox.js"></script>
+    <script src="./js/components/dropzone.js"></script>
+    <script src="./js/components/cards.js"></script>
+    <script src="./js/components/filters.js"></script>
+    
+    <!-- 5. Modais do Sistema -->
+    <script src="./js/modals/form-modal.js"></script>
+    <script src="./js/modals/view-modal.js"></script>
+    <script src="./js/modals/ai-search-modal.js"></script>
+    <script src="./js/modals/ai-config-modal.js"></script>
+    <script src="./js/modals/shortcuts-modal.js"></script>
+    
+    <!-- 6. Ponto de Entrada da Aplicação -->
+    <script src="./js/app.js"></script>
 </body>
 </html>

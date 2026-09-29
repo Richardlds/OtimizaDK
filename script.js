@@ -184,12 +184,42 @@ const viewTags = document.getElementById('viewTags');
 const viewProcedimento = document.getElementById('viewProcedimento');
 const viewComoResolver = document.getElementById('viewComoResolver');
 const btnCopiar = document.getElementById('btnCopiar');
+const btnCopiarChat = document.getElementById('btnCopiarChat');
+const btnToggleFavoritoView = document.getElementById('btnToggleFavoritoView');
+const btnImprimirView = document.getElementById('btnImprimirView');
+const viewImageSection = document.getElementById('viewImageSection');
+const viewGalleryGrid = document.getElementById('viewGalleryGrid');
+const viewGalleryCount = document.getElementById('viewGalleryCount');
 
+// Elementos de Fotos & Upload Múltiplo
+const dropZoneFotos = document.getElementById('dropZoneFotos');
 const imagemUpload = document.getElementById('imagemUpload');
-const imagemBase64 = document.getElementById('imagemBase64');
-const imagemPreview = document.getElementById('imagemPreview');
-const imgPreviewTag = imagemPreview ? imagemPreview.querySelector('img') : null;
-const btnRemoverImagem = document.getElementById('btnRemoverImagem');
+const formGalleryGrid = document.getElementById('formGalleryGrid');
+const uploadCountPill = document.getElementById('uploadCountPill');
+const btnAiAnalisarPrint = document.getElementById('btnAiAnalisarPrint');
+
+// Elementos do Lightbox (Visualizador Ampliado)
+const modalLightbox = document.getElementById('modalLightbox');
+const lightboxBackdrop = document.getElementById('lightboxBackdrop');
+const lightboxImage = document.getElementById('lightboxImage');
+const lightboxCounter = document.getElementById('lightboxCounter');
+const lightboxImgWrapper = document.getElementById('lightboxImgWrapper');
+const btnLightboxPrev = document.getElementById('btnLightboxPrev');
+const btnLightboxNext = document.getElementById('btnLightboxNext');
+const btnLightboxZoomIn = document.getElementById('btnLightboxZoomIn');
+const btnLightboxZoomOut = document.getElementById('btnLightboxZoomOut');
+const btnLightboxZoomReset = document.getElementById('btnLightboxZoomReset');
+const lightboxZoomLevel = document.getElementById('lightboxZoomLevel');
+const btnLightboxRotate = document.getElementById('btnLightboxRotate');
+const btnLightboxCopy = document.getElementById('btnLightboxCopy');
+const btnLightboxDownload = document.getElementById('btnLightboxDownload');
+const btnCloseLightbox = document.getElementById('btnCloseLightbox');
+const lightboxThumbsStrip = document.getElementById('lightboxThumbsStrip');
+
+// Elementos de Atalhos
+const modalShortcuts = document.getElementById('modalShortcuts');
+const closeShortcutsModal = document.getElementById('closeShortcutsModal');
+const btnOpenShortcuts = document.getElementById('btnOpenShortcuts');
 
 const mobileMenuBtn = document.getElementById('mobileMenuBtn');
 const sidebar = document.getElementById('sidebar');
@@ -236,6 +266,22 @@ let tagFiltroAtiva = null;
 let tipoFiltroAtivo = '';
 let tsFilterEstado = null;
 let tsEstado = null; 
+let itemVisualizandoAtual = null;
+
+// State de Fotos e Favoritos
+let fotosFormulario = [];
+let favoritos = new Set();
+try {
+    const favs = localStorage.getItem('otimizadk_favoritos');
+    if (favs) favoritos = new Set(JSON.parse(favs));
+} catch (_) {}
+
+let lightboxState = {
+    fotos: [],
+    index: 0,
+    zoom: 1,
+    rotate: 0
+}; 
 
 // ==========================================
 // INITIALIZATION
@@ -344,6 +390,7 @@ function aplicarFiltrosGlobais() {
 
     // 2. Atualizar contadores das abas de acesso rápido para acompanhar o filtro ativo
     const totalAll = baseFiltrada.length;
+    const totalFav = baseFiltrada.filter(d => favoritos.has(d.id) || d.favorito).length;
     const totalErros = baseFiltrada.filter(d => {
         const t = (d.tipo || '').toLowerCase();
         return t === 'erro' || t.includes('erro') || t.includes('falha');
@@ -358,18 +405,21 @@ function aplicarFiltrosGlobais() {
     }).length;
 
     const bAll = document.getElementById('badgeCountAll');
+    const bFav = document.getElementById('badgeCountFav');
     const bErro = document.getElementById('badgeCountErro');
     const bProc = document.getElementById('badgeCountProc');
     const bFaq = document.getElementById('badgeCountFaq');
 
     if (bAll) bAll.textContent = totalAll;
+    if (bFav) bFav.textContent = totalFav;
     if (bErro) bErro.textContent = totalErros;
     if (bProc) bProc.textContent = totalProc;
     if (bFaq) bFaq.textContent = totalFaq;
 
-    // 3. Filtrar pela aba selecionada (tipo: Erro, Procedimento, FAQ ou Todos)
+    // 3. Filtrar pela aba selecionada (tipo: Erro, Procedimento, FAQ, Favoritos ou Todos)
     const dadosExibidos = baseFiltrada.filter(item => {
         if (!tipoFiltroAtivo) return true;
+        if (tipoFiltroAtivo === 'Favoritos') return favoritos.has(item.id) || item.favorito;
         const t = (item.tipo || '').toLowerCase();
         if (tipoFiltroAtivo === 'Erro') return t === 'erro' || t.includes('erro') || t.includes('falha');
         if (tipoFiltroAtivo === 'Procedimento') return t === 'procedimento' || t.includes('procedimento') || t.includes('manual');
@@ -462,20 +512,6 @@ window.copiarSolucaoRapida = function(e, id) {
     });
 };
 
-document.addEventListener('keydown', (e) => {
-    // Atalho Ctrl+K ou Cmd+K para Busca Inteligente com IA
-    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault();
-        abrirModal(modalAiSearch);
-        if (aiSearchInput) aiSearchInput.focus();
-        return;
-    }
-    if (e.key === '/' && document.activeElement.tagName !== 'INPUT' && document.activeElement.tagName !== 'TEXTAREA') {
-        e.preventDefault();
-        searchInput.focus();
-    }
-});
-
 function obterClasseDaTag(tagBase) {
     const tag = tagBase.toLowerCase();
     if (tag.includes('erro') || tag.includes('urgente') || tag.includes('falha')) return 'badge-erro';
@@ -483,6 +519,25 @@ function obterClasseDaTag(tagBase) {
     if (tag.includes('procedimento') || tag.includes('aviso')) return 'badge-procedimento';
     if (tag.includes('codigo') || tag.includes('dev')) return 'badge-codigo';
     return 'badge-uf'; 
+}
+
+// Helper: Extrai lista normalizada de imagens do registro
+function extrairImagens(item) {
+    if (!item) return [];
+    if (Array.isArray(item.imagens) && item.imagens.length > 0) {
+        return item.imagens.filter(Boolean);
+    }
+    if (item.imagem && typeof item.imagem === 'string') {
+        const str = item.imagem.trim();
+        if (str.startsWith('[') && str.endsWith(']')) {
+            try {
+                const parsed = JSON.parse(str);
+                if (Array.isArray(parsed)) return parsed.filter(Boolean);
+            } catch (_) {}
+        }
+        if (str.length > 5) return [str];
+    }
+    return [];
 }
 
 function renderCards(listaFiltrada) {
@@ -523,8 +578,16 @@ function renderCards(listaFiltrada) {
 
         const tipoHTML = item.tipo ? `<span class="badge ${tipoBadgeClass}"><i data-lucide="${tipoIcon}" style="width: 11px;"></i> ${item.tipo}</span>` : '';
         const estadoHTML = item.estado ? `<span class="badge badge-uf" style="background:var(--bg-3); border-color:var(--border); color:var(--text-secondary);">${item.estado}</span>` : '';
-        const imageIcon = item.imagem ? `<span title="Contém imagem anexada"><i data-lucide="image" style="width: 14px; color: var(--accent);"></i></span>` : '';
+        
+        const imgs = extrairImagens(item);
+        let imageBadgeHTML = '';
+        if (imgs.length === 1) {
+            imageBadgeHTML = `<span class="card-img-badge" title="1 foto anexada"><i data-lucide="image" style="width: 12px;"></i> 1 foto</span>`;
+        } else if (imgs.length > 1) {
+            imageBadgeHTML = `<span class="card-img-badge" title="${imgs.length} fotos anexadas"><i data-lucide="images" style="width: 12px;"></i> ${imgs.length} fotos</span>`;
+        }
 
+        const isFav = favoritos.has(item.id) || item.favorito;
         const dataFormatada = new Date(item.id).toLocaleDateString('pt-BR');
 
         card.innerHTML = `
@@ -535,14 +598,19 @@ function renderCards(listaFiltrada) {
                     ${tagsHTML}
                     ${extraTagsCount}
                 </div>
+                <button class="card-fav-btn ${isFav ? 'active' : ''}" onclick="toggleFavorito(event, ${item.id})" title="${isFav ? 'Remover dos Favoritos' : 'Favoritar Procedimento'}">
+                    <i data-lucide="star" style="width: 15px;"></i>
+                </button>
             </div>
-            <h3 class="card-title" style="display:flex; justify-content:space-between; align-items:start; gap: 8px;">
+            <h3 class="card-title">
                 <span>${item.nomeErro}</span>
-                ${imageIcon}
             </h3>
             <p class="card-desc">${item.procedimento}</p>
             <div class="card-footer">
-                <span class="card-date"><i data-lucide="calendar" style="width: 12px; color: var(--text-muted);"></i> ${dataFormatada}</span>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span class="card-date"><i data-lucide="calendar" style="width: 12px; color: var(--text-muted);"></i> ${dataFormatada}</span>
+                    ${imageBadgeHTML}
+                </div>
                 <div class="card-actions" onclick="event.stopPropagation()">
                     <button class="icon-btn" onclick="copiarSolucaoRapida(event, ${item.id})" title="Copiar Solução"><i data-lucide="copy" style="width: 13px;"></i></button>
                     <button class="icon-btn" onclick="abrirEdicao(${item.id})" title="Editar"><i data-lucide="edit-2" style="width: 13px;"></i></button>
@@ -559,31 +627,223 @@ function renderCards(listaFiltrada) {
 }
 
 // ==========================================
-// UPLOAD DE IMAGEM (Base64)
+// UPLOAD DE MÚLTIPLAS FOTOS, DRAG & DROP E CLIPBOARD (PASTE)
 // ==========================================
-imagemUpload.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (file) {
-        if (file.size > 2 * 1024 * 1024) {
-            mostrarToast('A imagem deve ter no máximo 2MB.', 'error');
-            imagemUpload.value = '';
-            return;
-        }
+
+// Comprime e redimensiona imagem no cliente via Canvas
+async function comprimirERedimensionarImagem(file, maxWidth = 1600, maxHeight = 1600, qualidade = 0.85) {
+    return new Promise((resolve, reject) => {
         const reader = new FileReader();
-        reader.onload = function(event) {
-            imagemBase64.value = event.target.result;
-            imgPreviewTag.src = event.target.result;
-            imagemPreview.style.display = 'block';
-        };
         reader.readAsDataURL(file);
+        reader.onload = (event) => {
+            const img = new Image();
+            img.src = event.target.result;
+            img.onload = () => {
+                let width = img.width;
+                let height = img.height;
+
+                if (width > maxWidth || height > maxHeight) {
+                    if (width / height > maxWidth / maxHeight) {
+                        height = Math.round((height * maxWidth) / width);
+                        width = maxWidth;
+                    } else {
+                        width = Math.round((width * maxHeight) / height);
+                        height = maxHeight;
+                    }
+                }
+
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+
+                const compressedDataUrl = canvas.toDataURL('image/jpeg', qualidade);
+                resolve(compressedDataUrl);
+            };
+            img.onerror = (err) => reject(err);
+        };
+        reader.onerror = (err) => reject(err);
+    });
+}
+
+// Processa e adiciona lote de arquivos de imagem
+async function adicionarArquivosFotos(fileList) {
+    if (!fileList || fileList.length === 0) return;
+    const arrayFiles = Array.from(fileList).filter(f => f.type.startsWith('image/'));
+    if (arrayFiles.length === 0) {
+        mostrarToast('Por favor, selecione apenas arquivos de imagem.', 'error');
+        return;
+    }
+
+    let adicionadas = 0;
+    for (const file of arrayFiles) {
+        try {
+            const base64 = await comprimirERedimensionarImagem(file);
+            fotosFormulario.push(base64);
+            adicionadas++;
+        } catch (e) {
+            console.warn('Erro ao processar imagem:', e);
+        }
+    }
+
+    renderFormGallery();
+    if (adicionadas > 0) {
+        mostrarToast(`${adicionadas} foto(s) anexada(s) com sucesso!`, 'success');
+    }
+}
+
+// Renderiza a galeria de miniaturas dentro do formulário
+function renderFormGallery() {
+    if (!formGalleryGrid) return;
+    formGalleryGrid.innerHTML = '';
+
+    if (fotosFormulario.length === 0) {
+        formGalleryGrid.style.display = 'none';
+        if (uploadCountPill) uploadCountPill.style.display = 'none';
+        if (btnAiAnalisarPrint) btnAiAnalisarPrint.style.display = 'none';
+        return;
+    }
+
+    formGalleryGrid.style.display = 'grid';
+    if (uploadCountPill) {
+        uploadCountPill.textContent = `${fotosFormulario.length} ${fotosFormulario.length === 1 ? 'foto' : 'fotos'}`;
+        uploadCountPill.style.display = 'inline-block';
+    }
+    if (btnAiAnalisarPrint) {
+        btnAiAnalisarPrint.style.display = 'inline-flex';
+    }
+
+    fotosFormulario.forEach((foto, idx) => {
+        const thumb = document.createElement('div');
+        thumb.className = 'form-thumb-card';
+        thumb.innerHTML = `
+            <img src="${foto}" alt="Foto ${idx + 1}" title="Clique para ampliar">
+            <span class="form-thumb-badge">#${idx + 1}</span>
+            <button type="button" class="form-thumb-remove" title="Remover esta foto">
+                <i data-lucide="x" style="width: 12px;"></i>
+            </button>
+        `;
+
+        thumb.querySelector('img').addEventListener('click', () => {
+            abrirLightbox(fotosFormulario, idx);
+        });
+
+        thumb.querySelector('.form-thumb-remove').addEventListener('click', (e) => {
+            e.stopPropagation();
+            removerFotoFormulario(idx);
+        });
+
+        formGalleryGrid.appendChild(thumb);
+    });
+
+    lucide.createIcons();
+}
+
+function removerFotoFormulario(index) {
+    fotosFormulario.splice(index, 1);
+    renderFormGallery();
+}
+
+// Eventos da Dropzone
+if (dropZoneFotos) {
+    dropZoneFotos.addEventListener('click', () => {
+        if (imagemUpload) imagemUpload.click();
+    });
+
+    dropZoneFotos.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZoneFotos.classList.add('dragover');
+    });
+
+    dropZoneFotos.addEventListener('dragleave', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZoneFotos.classList.remove('dragover');
+    });
+
+    dropZoneFotos.addEventListener('drop', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        dropZoneFotos.classList.remove('dragover');
+        if (e.dataTransfer && e.dataTransfer.files) {
+            adicionarArquivosFotos(e.dataTransfer.files);
+        }
+    });
+}
+
+if (imagemUpload) {
+    imagemUpload.addEventListener('change', (e) => {
+        if (e.target.files && e.target.files.length > 0) {
+            adicionarArquivosFotos(e.target.files);
+            imagemUpload.value = '';
+        }
+    });
+}
+
+// Colar prints direto da área de transferência (Ctrl + V)
+window.addEventListener('paste', async (e) => {
+    // Se o modal de formulário estiver aberto
+    if (modalForm && modalForm.classList.contains('open')) {
+        const items = e.clipboardData ? e.clipboardData.items : [];
+        const imageFiles = [];
+        for (let i = 0; i < items.length; i++) {
+            if (items[i].type.indexOf('image') !== -1) {
+                const blob = items[i].getAsFile();
+                if (blob) imageFiles.push(blob);
+            }
+        }
+
+        if (imageFiles.length > 0) {
+            e.preventDefault();
+            await adicionarArquivosFotos(imageFiles);
+            mostrarToast('Print colado da área de transferência!', 'success');
+        }
     }
 });
 
-btnRemoverImagem.addEventListener('click', () => {
-    imagemUpload.value = '';
-    imagemBase64.value = '';
-    imagemPreview.style.display = 'none';
-});
+// Diagnosticar Print com IA (Multimodal Vision)
+if (btnAiAnalisarPrint) {
+    btnAiAnalisarPrint.addEventListener('click', async () => {
+        if (!verificarOuAbrirConfigAi()) return;
+        if (fotosFormulario.length === 0) {
+            mostrarToast('Anexe ao menos uma foto ou print para diagnosticar.', 'info');
+            return;
+        }
+
+        const originalHtml = btnAiAnalisarPrint.innerHTML;
+        btnAiAnalisarPrint.disabled = true;
+        btnAiAnalisarPrint.style.opacity = '0.7';
+        btnAiAnalisarPrint.innerHTML = '<i data-lucide="loader" class="lucide-spin" style="width: 14px; margin-right: 5px;"></i> Analisando Print com IA...';
+        lucide.createIcons();
+
+        try {
+            const contextoAdicional = document.getElementById('nomeErro').value.trim();
+            const diag = await window.aiService.diagnosticarImagemComIa(fotosFormulario, contextoAdicional);
+
+            if (diag.nomeErro) document.getElementById('nomeErro').value = diag.nomeErro;
+            if (diag.tipo) document.getElementById('tipo').value = diag.tipo;
+            if (diag.estado) {
+                if (tsEstado) tsEstado.setValue(diag.estado);
+                else document.getElementById('estado').value = diag.estado;
+            }
+            if (diag.procedimento) document.getElementById('procedimento').value = diag.procedimento;
+            if (diag.comoResolver) document.getElementById('comoResolver').value = diag.comoResolver;
+            if (diag.tags) document.getElementById('tags').value = diag.tags;
+
+            mostrarToast('Diagnóstico visual realizado com IA com sucesso!', 'success');
+        } catch (err) {
+            console.error('Erro no diagnóstico visual:', err);
+            mostrarToast(`Erro na análise visual: ${err.message}`, 'error');
+        } finally {
+            btnAiAnalisarPrint.disabled = false;
+            btnAiAnalisarPrint.style.opacity = '1';
+            btnAiAnalisarPrint.innerHTML = originalHtml;
+            lucide.createIcons();
+        }
+    });
+}
 
 // ==========================================
 // CRUD (Async)
@@ -594,9 +854,10 @@ btnAdicionar.addEventListener('click', () => {
     document.getElementById('tipo').value = 'Procedimento';
     if (tsEstado) tsEstado.setValue('Nacional');
     else document.getElementById('estado').value = 'Nacional';
-    imagemUpload.value = '';
-    imagemBase64.value = '';
-    imagemPreview.style.display = 'none';
+    
+    fotosFormulario = [];
+    renderFormGallery();
+    
     modalTitle.textContent = 'Novo Procedimento';
     abrirModal(modalForm);
 });
@@ -613,15 +874,18 @@ formProcedimento.addEventListener('submit', async (e) => {
     lucide.createIcons();
     
     const idExistente = erroIdInput.value;
+    const imagensSalvas = [...fotosFormulario];
     const novoRegistro = {
         id: idExistente ? parseInt(idExistente) : Date.now(),
         nomeErro: document.getElementById('nomeErro').value,
         tipo: document.getElementById('tipo').value,
         estado: document.getElementById('estado').value,
         tags: document.getElementById('tags').value,
-        imagem: imagemBase64.value,
+        imagens: imagensSalvas,
+        imagem: imagensSalvas.length > 0 ? JSON.stringify(imagensSalvas) : '',
         procedimento: document.getElementById('procedimento').value,
-        comoResolver: document.getElementById('comoResolver').value
+        comoResolver: document.getElementById('comoResolver').value,
+        favorito: favoritos.has(idExistente ? parseInt(idExistente) : null) || false
     };
 
     try {
@@ -661,15 +925,8 @@ window.abrirEdicao = function(id) {
     document.getElementById('procedimento').value = registro.procedimento;
     document.getElementById('comoResolver').value = registro.comoResolver;
     
-    if (registro.imagem) {
-        imagemBase64.value = registro.imagem;
-        imgPreviewTag.src = registro.imagem;
-        imagemPreview.style.display = 'block';
-    } else {
-        imagemUpload.value = '';
-        imagemBase64.value = '';
-        imagemPreview.style.display = 'none';
-    }
+    fotosFormulario = extrairImagens(registro);
+    renderFormGallery();
 
     modalTitle.textContent = 'Editar Procedimento';
     abrirModal(modalForm);
@@ -679,6 +936,8 @@ window.excluirRegistro = async function(id) {
     if (confirm("Excluir permanentemente este registro?")) {
         try {
             await db.delete(id);
+            favoritos.delete(id);
+            salvarFavoritos();
             dados = await db.getAll();
             
             const arrayRestantes = [];
@@ -701,24 +960,88 @@ window.excluirRegistro = async function(id) {
 };
 
 // ==========================================
-// VISUALIZAÇÃO
+// FORMATAÇÃO E VISUALIZAÇÃO COM GALERIA
 // ==========================================
+
+function renderizarMarkdown(texto) {
+    if (!texto) return '';
+    let html = texto
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+
+    // Blocos de código ```linguagem ... ```
+    html = html.replace(/```([a-zA-Z0-9_-]*)\n([\s\S]*?)```/g, function(match, lang, code) {
+        const id = 'code_' + Math.random().toString(36).substr(2, 9);
+        return `
+            <div class="code-block-wrap">
+                <div class="code-block-header">
+                    <span class="code-lang"><i data-lucide="code" style="width:12px; margin-right:4px;"></i>${lang || 'código'}</span>
+                    <button type="button" onclick="copiarBlocoCodigo('${id}')">
+                        <i data-lucide="copy" style="width: 12px;"></i> Copiar Código
+                    </button>
+                </div>
+                <pre class="code-block-content" id="${id}">${code.trim()}</pre>
+            </div>
+        `;
+    });
+
+    // Código em linha `código`
+    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+    // Negrito **texto**
+    html = html.replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
+
+    // Itálico *texto*
+    html = html.replace(/\*([^*]+)\*/g, '<i>$1</i>');
+
+    // Quebras de linha para <br>
+    return html.replace(/\n/g, '<br>');
+}
+
+window.copiarBlocoCodigo = function(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    navigator.clipboard.writeText(el.innerText || el.textContent).then(() => {
+        mostrarToast('Trecho de código copiado!', 'success');
+    });
+};
+
 function abrirVisualizacao(item) {
+    itemVisualizandoAtual = item;
     viewTitle.textContent = item.nomeErro;
-    viewProcedimento.textContent = item.procedimento;
-    viewComoResolver.textContent = item.comoResolver;
+    viewProcedimento.innerHTML = renderizarMarkdown(item.procedimento);
+    viewComoResolver.innerHTML = renderizarMarkdown(item.comoResolver);
     
-    const viewImageSection = document.getElementById('viewImageSection');
-    const viewImage = document.getElementById('viewImage');
-    
-    if (item.imagem) {
-        viewImage.src = item.imagem;
+    // Configura Galeria de Fotos
+    const imagens = extrairImagens(item);
+    if (imagens.length > 0) {
+        viewGalleryGrid.innerHTML = '';
+        if (viewGalleryCount) viewGalleryCount.textContent = imagens.length;
+        
+        imagens.forEach((imgSrc, idx) => {
+            const card = document.createElement('div');
+            card.className = 'view-gallery-card';
+            card.innerHTML = `
+                <img src="${imgSrc}" alt="Foto ${idx + 1}">
+                <div class="view-gallery-overlay">
+                    <span class="view-gallery-num">#${idx + 1} de ${imagens.length}</span>
+                    <div class="view-gallery-zoom-icon"><i data-lucide="zoom-in" style="width:14px;"></i></div>
+                </div>
+            `;
+            card.addEventListener('click', () => {
+                abrirLightbox(imagens, idx);
+            });
+            viewGalleryGrid.appendChild(card);
+        });
+
         viewImageSection.style.display = 'block';
     } else {
-        viewImage.src = '';
+        viewGalleryGrid.innerHTML = '';
         viewImageSection.style.display = 'none';
     }
     
+    // Badges de categoria e estado
     let badgesHTML = '';
     if (item.tipo) {
         const tipoBadgeClass = item.tipo === 'Erro' ? 'badge-erro' : (item.tipo === 'Procedimento' ? 'badge-procedimento' : 'badge-faq');
@@ -733,6 +1056,23 @@ function abrirVisualizacao(item) {
     
     viewTags.innerHTML = badgesHTML;
     
+    // Botão de Favoritar no Modal
+    if (btnToggleFavoritoView) {
+        const isFav = favoritos.has(item.id) || item.favorito;
+        btnToggleFavoritoView.classList.toggle('active', isFav);
+        btnToggleFavoritoView.onclick = () => {
+            toggleFavorito(null, item.id);
+        };
+    }
+
+    // Botão Imprimir / Exportar PDF
+    if (btnImprimirView) {
+        btnImprimirView.onclick = () => {
+            window.print();
+        };
+    }
+
+    // Copiar Solução Simples
     btnCopiar.onclick = () => {
         navigator.clipboard.writeText(item.comoResolver).then(() => {
             mostrarToast('Solução copiada para a área de transferência!', 'success');
@@ -741,7 +1081,258 @@ function abrirVisualizacao(item) {
         });
     };
 
+    // Copiar formatado para WhatsApp / Chat
+    if (btnCopiarChat) {
+        btnCopiarChat.onclick = () => {
+            const textoChat = `🛠️ *[${(item.tipo || 'PROCEDIMENTO').toUpperCase()}] ${item.nomeErro}* (UF: ${item.estado || 'Nacional'})
+━━━━━━━━━━━━━━━━━━━━━
+📋 *Contexto:*
+${item.procedimento}
+
+✅ *Como Resolver:*
+${item.comoResolver}
+━━━━━━━━━━━━━━━━━━━━━
+🏷️ _Tags: ${item.tags || 'Geral'}_`;
+
+            navigator.clipboard.writeText(textoChat).then(() => {
+                mostrarToast('Texto formatado para WhatsApp/Teams copiado!', 'success');
+            }).catch(() => {
+                mostrarToast('Erro ao copiar.', 'error');
+            });
+        };
+    }
+
     abrirModal(modalView);
+    lucide.createIcons();
+}
+
+// ==========================================
+// CONTROLE DE FAVORITOS
+// ==========================================
+window.toggleFavorito = function(e, id) {
+    if (e) e.stopPropagation();
+    if (favoritos.has(id)) {
+        favoritos.delete(id);
+        mostrarToast('Removido dos favoritos.', 'info');
+    } else {
+        favoritos.add(id);
+        mostrarToast('Adicionado aos favoritos! ⭐', 'success');
+    }
+    salvarFavoritos();
+    atualizarInterface();
+
+    if (itemVisualizandoAtual && itemVisualizandoAtual.id === id && btnToggleFavoritoView) {
+        btnToggleFavoritoView.classList.toggle('active', favoritos.has(id));
+    }
+};
+
+function salvarFavoritos() {
+    try {
+        localStorage.setItem('otimizadk_favoritos', JSON.stringify(Array.from(favoritos)));
+    } catch (_) {}
+}
+
+// ==========================================
+// LIGHTBOX (VISUALIZADOR EM TELA CHEIA COM ZOOM)
+// ==========================================
+function abrirLightbox(fotos, indexInicial = 0) {
+    if (!fotos || fotos.length === 0) return;
+    lightboxState.fotos = fotos;
+    lightboxState.index = Math.max(0, Math.min(indexInicial, fotos.length - 1));
+    lightboxState.zoom = 1;
+    lightboxState.rotate = 0;
+
+    atualizarLightbox();
+    if (modalLightbox) modalLightbox.classList.add('open');
+    lucide.createIcons();
+}
+
+function fecharLightbox() {
+    if (modalLightbox) modalLightbox.classList.remove('open');
+}
+
+function atualizarLightbox() {
+    if (!lightboxImage || lightboxState.fotos.length === 0) return;
+    const currentFoto = lightboxState.fotos[lightboxState.index];
+    lightboxImage.src = currentFoto;
+    
+    if (lightboxCounter) {
+        lightboxCounter.textContent = `${lightboxState.index + 1} / ${lightboxState.fotos.length}`;
+    }
+
+    aplicarTransformLightbox();
+
+    if (btnLightboxPrev) btnLightboxPrev.style.display = lightboxState.fotos.length > 1 ? 'flex' : 'none';
+    if (btnLightboxNext) btnLightboxNext.style.display = lightboxState.fotos.length > 1 ? 'flex' : 'none';
+
+    // Barra de Miniaturas
+    if (lightboxThumbsStrip) {
+        lightboxThumbsStrip.innerHTML = '';
+        if (lightboxState.fotos.length > 1) {
+            lightboxState.fotos.forEach((foto, i) => {
+                const item = document.createElement('div');
+                item.className = `lightbox-thumb-item ${i === lightboxState.index ? 'active' : ''}`;
+                item.innerHTML = `<img src="${foto}" alt="Miniatura ${i + 1}">`;
+                item.addEventListener('click', () => {
+                    lightboxState.index = i;
+                    lightboxState.zoom = 1;
+                    lightboxState.rotate = 0;
+                    atualizarLightbox();
+                });
+                lightboxThumbsStrip.appendChild(item);
+            });
+            lightboxThumbsStrip.style.display = 'flex';
+        } else {
+            lightboxThumbsStrip.style.display = 'none';
+        }
+    }
+}
+
+function aplicarTransformLightbox() {
+    if (!lightboxImage) return;
+    lightboxImage.style.transform = `scale(${lightboxState.zoom}) rotate(${lightboxState.rotate}deg)`;
+    if (lightboxZoomLevel) {
+        lightboxZoomLevel.textContent = `${Math.round(lightboxState.zoom * 100)}%`;
+    }
+}
+
+if (btnLightboxZoomIn) {
+    btnLightboxZoomIn.addEventListener('click', () => {
+        lightboxState.zoom = Math.min(3.5, lightboxState.zoom + 0.25);
+        aplicarTransformLightbox();
+    });
+}
+
+if (btnLightboxZoomOut) {
+    btnLightboxZoomOut.addEventListener('click', () => {
+        lightboxState.zoom = Math.max(0.5, lightboxState.zoom - 0.25);
+        aplicarTransformLightbox();
+    });
+}
+
+if (btnLightboxZoomReset) {
+    btnLightboxZoomReset.addEventListener('click', () => {
+        lightboxState.zoom = 1;
+        lightboxState.rotate = 0;
+        aplicarTransformLightbox();
+    });
+}
+
+if (btnLightboxRotate) {
+    btnLightboxRotate.addEventListener('click', () => {
+        lightboxState.rotate = (lightboxState.rotate + 90) % 360;
+        aplicarTransformLightbox();
+    });
+}
+
+if (btnLightboxPrev) {
+    btnLightboxPrev.addEventListener('click', () => {
+        if (lightboxState.fotos.length <= 1) return;
+        lightboxState.index = (lightboxState.index - 1 + lightboxState.fotos.length) % lightboxState.fotos.length;
+        lightboxState.zoom = 1;
+        lightboxState.rotate = 0;
+        atualizarLightbox();
+    });
+}
+
+if (btnLightboxNext) {
+    btnLightboxNext.addEventListener('click', () => {
+        if (lightboxState.fotos.length <= 1) return;
+        lightboxState.index = (lightboxState.index + 1) % lightboxState.fotos.length;
+        lightboxState.zoom = 1;
+        lightboxState.rotate = 0;
+        atualizarLightbox();
+    });
+}
+
+if (btnLightboxCopy) {
+    btnLightboxCopy.addEventListener('click', () => {
+        const currentFoto = lightboxState.fotos[lightboxState.index];
+        if (!currentFoto) return;
+        navigator.clipboard.writeText(currentFoto).then(() => {
+            mostrarToast('Link/Base64 da imagem copiado!', 'success');
+        });
+    });
+}
+
+if (btnLightboxDownload) {
+    btnLightboxDownload.addEventListener('click', () => {
+        const currentFoto = lightboxState.fotos[lightboxState.index];
+        if (!currentFoto) return;
+        const link = document.createElement('a');
+        link.href = currentFoto;
+        link.download = `otimizadk-foto-${lightboxState.index + 1}.jpg`;
+        link.click();
+        mostrarToast('Download iniciado.', 'info');
+    });
+}
+
+if (btnCloseLightbox) btnCloseLightbox.addEventListener('click', fecharLightbox);
+if (lightboxBackdrop) lightboxBackdrop.addEventListener('click', fecharLightbox);
+
+// ==========================================
+// ATALHOS DE TECLADO GLOBAIS
+// ==========================================
+document.addEventListener('keydown', (e) => {
+    // Se o Lightbox estiver aberto
+    if (modalLightbox && modalLightbox.classList.contains('open')) {
+        if (e.key === 'Escape') {
+            fecharLightbox();
+            return;
+        }
+        if (e.key === 'ArrowLeft') {
+            if (btnLightboxPrev) btnLightboxPrev.click();
+            return;
+        }
+        if (e.key === 'ArrowRight') {
+            if (btnLightboxNext) btnLightboxNext.click();
+            return;
+        }
+        if (e.key === '+' || e.key === '=') {
+            if (btnLightboxZoomIn) btnLightboxZoomIn.click();
+            return;
+        }
+        if (e.key === '-') {
+            if (btnLightboxZoomOut) btnLightboxZoomOut.click();
+            return;
+        }
+    }
+
+    // Atalho Ctrl+K ou Cmd+K para Busca Inteligente com IA
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        abrirModal(modalAiSearch);
+        if (aiSearchInput) aiSearchInput.focus();
+        return;
+    }
+
+    // Atalhos quando NÃO estiver digitando em campos de texto
+    const tag = document.activeElement ? document.activeElement.tagName : '';
+    const isEditing = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+
+    if (!isEditing) {
+        if (e.key === '/') {
+            e.preventDefault();
+            searchInput.focus();
+        } else if (e.key.toLowerCase() === 'n') {
+            e.preventDefault();
+            btnAdicionar.click();
+        } else if (e.key.toLowerCase() === 'f') {
+            e.preventDefault();
+            const tabFav = document.getElementById('tabFavoritos');
+            if (tabFav) tabFav.click();
+        } else if (e.key === '?') {
+            e.preventDefault();
+            if (modalShortcuts) abrirModal(modalShortcuts);
+        }
+    }
+});
+
+if (btnOpenShortcuts && modalShortcuts) {
+    btnOpenShortcuts.addEventListener('click', () => abrirModal(modalShortcuts));
+}
+if (closeShortcutsModal && modalShortcuts) {
+    closeShortcutsModal.addEventListener('click', () => fecharModal(modalShortcuts));
 }
 
 function mostrarToast(mensagem, tipo = 'success') {
